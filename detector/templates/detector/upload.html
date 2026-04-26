@@ -1,0 +1,445 @@
+{% extends "detector/base.html" %}
+
+{% block title %}Upload Videos{% endblock %}
+{% block page_title %}Upload Videos{% endblock %}
+{% block page_subtitle %}Upload sample videos for training and test videos for detection{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+    <!-- Upload Form Card -->
+    <div class="card upload-card" id="upload-section">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload Video File
+        </h2>
+        <form method="POST" enctype="multipart/form-data" class="upload-form" id="upload-form">
+            {% csrf_token %}
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="video-title" class="form-label">Video Title</label>
+                    {{ form.title }}
+                </div>
+                <div class="form-group">
+                    <label for="video-type" class="form-label">Video Type</label>
+                    {{ form.video_type }}
+                    <span class="form-hint">Sample videos are used for training. Test videos are used for detection.</span>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="video-label" class="form-label">Label</label>
+                    {{ form.label }}
+                    <span class="form-hint">For sample videos: Mark as Real or Fake so the model can learn from it. For test videos: This is optional.</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Video File</label>
+                <div class="file-drop-zone" id="file-drop-zone">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="drop-icon">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p class="drop-text">Drag and drop your video here</p>
+                    <p class="drop-subtext">or click to browse • MP4, AVI, MOV, MKV supported (up to 500MB)</p>
+                    {{ form.video_file }}
+                    <div class="file-info" id="file-info" style="display:none;">
+                        <span class="file-name" id="file-name"></span>
+                        <span class="file-size" id="file-size"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="upload-progress" id="upload-progress" style="display:none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <span class="progress-text" id="progress-text">Uploading...</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg" id="upload-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                Upload Video
+            </button>
+        </form>
+    </div>
+
+    <!-- Sample Videos Section -->
+    <div class="card" id="sample-videos-section">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+            </svg>
+            Sample Videos (for Training)
+        </h2>
+        <div class="dataset-stats" style="margin-bottom: 20px;">
+            <div class="dataset-stat">
+                <span class="ds-value">{{ sample_videos|length }}</span>
+                <span class="ds-label">Total Samples</span>
+            </div>
+            <div class="dataset-stat">
+                <span class="ds-value">{{ labeled_sample_count }}</span>
+                <span class="ds-label">Labeled</span>
+            </div>
+        </div>
+
+        {% if sample_videos %}
+        <div class="results-table-wrapper">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Size</th>
+                        <th>Duration</th>
+                        <th>Frames</th>
+                        <th>Label</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for video in sample_videos %}
+                    <tr id="video-row-{{ video.id }}">
+                        <td class="video-name">{{ video.title }}</td>
+                        <td>{{ video.file_size_mb|floatformat:1 }} MB</td>
+                        <td>{{ video.duration_seconds|floatformat:1 }}s</td>
+                        <td>{{ video.frame_count }}</td>
+                        <td>
+                            <select class="form-select form-select-sm label-select" data-id="{{ video.id }}">
+                                <option value="unlabeled" {% if video.label == 'unlabeled' %}selected{% endif %}>Unlabeled</option>
+                                <option value="real" {% if video.label == 'real' %}selected{% endif %}>✓ Real</option>
+                                <option value="fake" {% if video.label == 'fake' %}selected{% endif %}>✗ Fake</option>
+                            </select>
+                        </td>
+                        <td>
+                            <span class="status-badge {{ video.status }}">{{ video.get_status_display }}</span>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="{{ video.id }}">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 20px;">
+            <p>No sample videos uploaded yet. Upload real and fake videos for training.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Test Videos Section -->
+    <div class="card" id="test-videos-section">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            Test Videos (for Detection)
+        </h2>
+        <div class="dataset-stats" style="margin-bottom: 20px;">
+            <div class="dataset-stat">
+                <span class="ds-value">{{ test_videos|length }}</span>
+                <span class="ds-label">Total Tests</span>
+            </div>
+        </div>
+
+        {% if test_videos %}
+        <div class="results-table-wrapper">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Size</th>
+                        <th>Duration</th>
+                        <th>Frames</th>
+                        <th>Verdict</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for video in test_videos %}
+                    <tr id="video-row-{{ video.id }}">
+                        <td class="video-name">{{ video.title }}</td>
+                        <td>{{ video.file_size_mb|floatformat:1 }} MB</td>
+                        <td>{{ video.duration_seconds|floatformat:1 }}s</td>
+                        <td>{{ video.frame_count }}</td>
+                        <td>
+                            {% if video.status == 'analyzed' and video.result %}
+                            <span class="verdict-badge {% if video.result.verdict == 'fake' %}fake{% else %}real{% endif %}" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: {% if video.result.verdict == 'fake' %}#ffe5e5; color: #dc3545;{% else %}#e5f5ed; color: #28a745;{% endif %}">
+                                {{ video.result.verdict|upper }}
+                            </span>
+                            {% else %}
+                            <span style="color: #999;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="status-badge {{ video.status }}">{{ video.get_status_display }}</span>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="{{ video.id }}">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 20px;">
+            <p>No test videos uploaded yet. Upload a video to test for forgery detection.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File drop zone handling
+    const dropZone = document.getElementById('file-drop-zone');
+    const fileInput = document.getElementById('video-file');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+
+    if (dropZone && fileInput) {
+        dropZone.addEventListener('click', function(e) {
+            if (e.target === dropZone || dropZone.contains(e.target)) {
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileInfo(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                updateFileInfo(fileInput.files[0]);
+            }
+        });
+
+        function updateFileInfo(file) {
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.style.display = 'flex';
+            dropZone.classList.add('has-file');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+    }
+    
+    // AJAX interactions
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadForm = document.getElementById('upload-form');
+        const uploadBtn = document.getElementById('upload-submit');
+        const progressDiv = document.getElementById('upload-progress');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        const videosTableBody = document.querySelector('.results-table tbody');
+        const emptyState = document.querySelector('#videos-list .empty-state');
+        const tableWrapper = document.querySelector('.results-table-wrapper');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(uploadForm);
+            
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
+            progressDiv.style.display = 'block';
+            progressFill.style.width = '100%';
+            progressText.innerText = 'Uploading and processing video...';
+            
+            try {
+                const response = await fetch("{% url 'ajax_upload_video' %}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Update dataset stats
+                    const dsValues = document.querySelectorAll('.ds-value');
+                    if (dsValues.length >= 2) {
+                        dsValues[0].textContent = parseInt(dsValues[0].textContent) + 1;
+                        if (data.video.label !== 'unlabeled') {
+                            dsValues[1].textContent = parseInt(dsValues[1].textContent) + 1;
+                        }
+                    }
+                    
+                    uploadForm.reset();
+                    fileInfo.style.display = 'none';
+                    dropZone.classList.remove('has-file');
+                    
+                    const rowHtml = `
+                        <tr id="video-row-${data.video_id}">
+                            <td class="video-name">${data.video.title}</td>
+                            <td>${data.video.file_size_mb} MB</td>
+                            <td>${data.video.duration_seconds}s</td>
+                            <td>${data.video.frame_count}</td>
+                            <td>
+                                <select class="form-select form-select-sm label-select" data-id="${data.video_id}">
+                                    <option value="unlabeled" ${data.video.label === 'unlabeled' ? 'selected' : ''}>Unlabeled</option>
+                                    <option value="real" ${data.video.label === 'real' ? 'selected' : ''}>✓ Real</option>
+                                    <option value="fake" ${data.video.label === 'fake' ? 'selected' : ''}>✗ Fake</option>
+                                </select>
+                            </td>
+                            <td>
+                                <span class="status-badge ${data.video.status}">${data.video.status_display}</span>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="${data.video_id}">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    
+                    if (emptyState) {
+                        emptyState.style.display = 'none';
+                        if (!videosTableBody) {
+                            // If table didn't exist
+                            window.location.reload(); 
+                        } else {
+                            videosTableBody.insertAdjacentHTML('afterbegin', rowHtml);
+                            if (tableWrapper) tableWrapper.style.display = 'block';
+                        }
+                    } else if (videosTableBody) {
+                        videosTableBody.insertAdjacentHTML('afterbegin', rowHtml);
+                    }
+                    
+                } else {
+                    alert(data.message || 'Upload failed');
+                }
+            } catch(err) {
+                console.error(err);
+                alert('Network error during upload');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload Video
+                `;
+                progressDiv.style.display = 'none';
+                progressFill.style.width = '0%';
+            }
+        });
+        
+        // Delegation for delete
+        document.querySelector('#videos-list').addEventListener('click', async function(e) {
+            if (e.target.classList.contains('delete-btn')) {
+                if (!confirm('Are you sure you want to delete this video?')) return;
+                
+                const btn = e.target;
+                const videoId = btn.getAttribute('data-id');
+                btn.disabled = true;
+                btn.innerText = 'Deleting...';
+                
+                try {
+                    const response = await fetch(`/ajax/upload/delete/${videoId}/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        const row = document.getElementById(`video-row-${videoId}`);
+                        if (row) {
+                            // Optionally update label count if we want to be exact, but easiest is just remove row
+                            row.remove();
+                        }
+                        
+                        const dsValues = document.querySelectorAll('.ds-value');
+                        if (dsValues.length >= 1) {
+                            dsValues[0].textContent = parseInt(dsValues[0].textContent) - 1;
+                        }
+                    } else {
+                        alert(data.message);
+                        btn.disabled = false;
+                        btn.innerText = 'Delete';
+                    }
+                } catch(err) {
+                    alert('Error deleting video');
+                    btn.disabled = false;
+                    btn.innerText = 'Delete';
+                }
+            }
+        });
+        
+        // Delegation for label update
+        document.querySelector('#videos-list').addEventListener('change', async function(e) {
+            if (e.target.classList.contains('label-select')) {
+                const select = e.target;
+                const videoId = select.getAttribute('data-id');
+                const newLabel = select.value;
+                
+                select.disabled = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('label', newLabel);
+                    
+                    const response = await fetch(`/ajax/upload/label/${videoId}/`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-CSRFToken': csrfToken }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // success, maybe update label counts?
+                    } else {
+                        alert(data.message);
+                    }
+                } catch(err) {
+                    alert('Error updating label');
+                } finally {
+                    select.disabled = false;
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

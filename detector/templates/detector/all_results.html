@@ -1,0 +1,83 @@
+{% extends "detector/base.html" %}
+{% load detector_filters %}
+
+{% block title %}All Results{% endblock %}
+{% block page_title %}All Results{% endblock %}
+{% block page_subtitle %}Browse all video analysis results{% endblock %}
+
+{% block content %}
+<div class="all-results-page">
+    <div class="card" id="results-list">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Analysis Results
+        </h2>
+
+        {% if results %}
+        <div class="results-table-wrapper">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Video</th>
+                        <th>Verdict</th>
+                        <th>Confidence</th>
+                        <th>Frames Analyzed</th>
+                        <th>Fake Frames</th>
+                        <th>Real Frames</th>
+                        <th>Processing Time</th>
+                        <th>Analyzed At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td class="video-name">
+                            <div style="font-weight: 600; margin-bottom: 5px;">{{ result.video.title }}</div>
+                            {% if result.verdict == 'fake' and result.regions.first %}
+                            <img src="{{ result.regions.first.annotated_frame.url }}" alt="Screenshot" style="width: 120px; border-radius: 4px; border: 1px solid #e53e3e;" />
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="verdict-badge {% if result.verdict == 'fake' %}fake{% else %}real{% endif %}">
+                                Video is detected as {{ result.verdict|upper }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill {% if result.verdict == 'fake' %}fake{% else %}real{% endif %}"
+                                     style="width: {{ result.confidence|pct|floatformat:0 }}%"></div>
+                                <span class="confidence-text">{{ result.confidence|pct|floatformat:1 }}%</span>
+                            </div>
+                        </td>
+                        <td>{{ result.total_frames_analyzed }}</td>
+                        <td class="{% if result.fake_frame_count > 0 %}text-danger{% endif %}">{{ result.fake_frame_count }}</td>
+                        <td class="{% if result.real_frame_count > 0 %}text-success{% endif %}">{{ result.real_frame_count }}</td>
+                        <td>{{ result.processing_time_seconds|floatformat:1 }}s</td>
+                        <td>{{ result.analyzed_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'view_results' result.video.id %}" class="btn btn-sm btn-primary" id="view-result-{{ result.id }}">
+                                View Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <p>No analysis results yet.</p>
+            <a href="{% url 'detect_forgery' %}" class="btn btn-primary" id="start-detection-btn">Start Detection</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

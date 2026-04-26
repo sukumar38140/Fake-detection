@@ -1,0 +1,104 @@
+{% extends "detector/base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Override for auth pages - hide sidebar/topbar if needed, but here we just center the card */
+    .auth-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 150px);
+    }
+    .auth-card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        padding: var(--space-3xl) var(--space-2xl);
+        box-shadow: var(--shadow-lg);
+    }
+    .auth-header {
+        text-align: center;
+        margin-bottom: var(--space-2xl);
+    }
+    .auth-logo {
+        display: flex;
+        justify-content: center;
+        margin-bottom: var(--space-base);
+    }
+    .auth-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-xs);
+    }
+    .auth-subtitle {
+        color: var(--color-text-tertiary);
+        font-size: var(--font-size-sm);
+    }
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xl);
+    }
+    .auth-footer {
+        margin-top: var(--space-2xl);
+        text-align: center;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+    }
+    .auth-footer a {
+        font-weight: 600;
+        color: var(--color-primary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">
+                <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
+                    <rect width="28" height="28" rx="8" fill="url(#logoGradAuth)"/>
+                    <path d="M8 14L12 18L20 10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="logoGradAuth" x1="0" y1="0" x2="28" y2="28">
+                            <stop stop-color="#6366f1"/>
+                            <stop offset="1" stop-color="#a855f7"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h2 class="auth-title">System Login</h2>
+            <p class="auth-subtitle">DeepFake Detection Forensic Tool</p>
+        </div>
+
+        <form method="POST" class="auth-form">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <div class="text-danger" style="font-size: var(--font-size-xs); margin-top: 4px;">
+                    {{ field.errors|striptags }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            
+            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-md);">
+                Sign In
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Don't have an account? <a href="{% url 'register' %}">Create one</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

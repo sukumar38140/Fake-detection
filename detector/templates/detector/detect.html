@@ -1,0 +1,153 @@
+{% extends "detector/base.html" %}
+
+{% block title %}Detect Forgery{% endblock %}
+{% block page_title %}Detect Forgery{% endblock %}
+{% block page_subtitle %}Check if your video is real or fake{% endblock %}
+
+{% block content %}
+<div class="detect-page">
+    {% if not model_exists %}
+    <div class="alert alert-warning" id="no-model-alert">
+        <div class="alert-content">
+            <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>
+                No trained model found. Please <a href="{% url 'train_model' %}" style="color: var(--color-primary); font-weight: 600;">train a model</a> first before running detection.
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Current Test Video Analysis -->
+    <div class="card" id="current-video-section">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            Current Video Analysis
+        </h2>
+
+        {% if video %}
+        <div class="video-analysis-card">
+            <div class="video-card-header">
+                <div class="video-thumb">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </div>
+                <div class="video-card-info">
+                    <h4>{{ video.title }}</h4>
+                    <div class="video-meta">
+                        <span>{{ video.file_size_mb|floatformat:1 }} MB</span>
+                        <span>•</span>
+                        <span>{{ video.duration_seconds|floatformat:1 }}s</span>
+                        <span>•</span>
+                        <span>{{ video.frame_count }} frames</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-card-status" style="margin-top: 15px;">
+                <span class="status-badge {{ video.status }}">{{ video.get_status_display }}</span>
+            </div>
+
+            <!-- Analysis Result Display -->
+            {% if video.result %}
+            <div class="analysis-result-preview" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <div class="verdict-summary">
+                    {% if video.result.verdict == 'fake' %}
+                    <div style="color: #dc3545; font-weight: 600; font-size: 16px;">
+                        ⚠️ FORGERY DETECTED
+                    </div>
+                    <p style="margin-top: 8px; color: #666;">This video appears to be manipulated.</p>
+                    {% else %}
+                    <div style="color: #28a745; font-weight: 600; font-size: 16px;">
+                        ✓ AUTHENTIC VIDEO
+                    </div>
+                    <p style="margin-top: 8px; color: #666;">This video appears to be authentic.</p>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+                    <div>
+                        <span style="color: #666;">Confidence:</span>
+                        <span style="font-weight: 600; margin-left: 5px;">{{ video.result.confidence|floatformat:1 }}%</span>
+                    </div>
+                    <div>
+                        <span style="color: #666;">Suspicious Frames:</span>
+                        <span style="font-weight: 600; margin-left: 5px;">{{ video.result.fake_frame_count }} / {{ video.result.total_frames_analyzed }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-card-actions" style="margin-top: 15px;">
+                {% if model_exists and video.status != 'processing' %}
+                    {% if video.status != 'analyzed' %}
+                    <a href="{% url 'run_detection' video.id %}" class="btn btn-primary btn-sm" id="run-detect-btn"
+                       onclick="this.innerHTML='<span class=\'spinner\'></span> Analyzing...'; this.style.pointerEvents='none'; this.style.opacity='0.7';">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                        Run Analysis
+                    </a>
+                    {% else %}
+                    <a href="{% url 'view_results' video.id %}" class="btn btn-primary btn-sm" id="view-result-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        View Detailed Report
+                    </a>
+                    {% endif %}
+                {% else %}
+                    <button class="btn btn-secondary btn-sm" disabled>Train Model First</button>
+                {% endif %}
+            </div>
+            {% else %}
+            <div style="margin-top: 20px; padding: 20px; text-align: center; background: #f8f9fa; border-radius: 8px;">
+                <p style="color: #666; margin-bottom: 15px;">No analysis results yet. Click "Run Analysis" to detect forgery.</p>
+                {% if model_exists and video.status != 'processing' %}
+                <a href="{% url 'run_detection' video.id %}" class="btn btn-primary" id="run-detect-btn"
+                   onclick="this.innerHTML='<span class=\'spinner\'></span> Analyzing...'; this.style.pointerEvents='none'; this.style.opacity='0.7';">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    Run Analysis
+                </a>
+                {% else %}
+                <button class="btn btn-secondary" disabled>Train Model First</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon" style="width: 48px; height: 48px; margin: 0 auto 15px;">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            <p style="font-size: 16px; color: #666; margin-bottom: 15px;">No test video uploaded yet.</p>
+            <p style="color: #999; margin-bottom: 20px;">Upload a video to check if it's real or fake.</p>
+            <a href="{% url 'upload_video' %}" class="btn btn-primary" id="upload-first-btn">Upload Test Video</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Results from All Test Videos -->
+    <div class="card" id="recent-results-section" style="margin-top: 30px;">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            All Analysis Results
+        </h2>
+        <a href="{% url 'all_results' %}" class="btn btn-outline btn-sm" style="margin-bottom: 15px;">View All Results</a>
+    </div>
+</div>
+{% endblock %}

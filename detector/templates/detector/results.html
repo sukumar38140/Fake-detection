@@ -1,0 +1,291 @@
+{% extends "detector/base.html" %}
+{% load static %}
+{% load detector_filters %}
+
+{% block title %}Results - {{ video.title }}{% endblock %}
+{% block page_title %}Analysis Results{% endblock %}
+{% block page_subtitle %}{{ video.title }}{% endblock %}
+
+{% block content %}
+<div class="results-page">
+    <!-- Verdict Card -->
+    <div class="verdict-card {{ analysis.verdict }}" id="verdict-card">
+        <div class="verdict-icon">
+            {% if analysis.verdict == 'fake' %}
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3">
+                <circle cx="32" cy="32" r="28"/>
+                <line x1="40" y1="24" x2="24" y2="40"/>
+                <line x1="24" y1="24" x2="40" y2="40"/>
+            </svg>
+            {% else %}
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3">
+                <circle cx="32" cy="32" r="28"/>
+                <polyline points="22 32 28 38 42 24"/>
+            </svg>
+            {% endif %}
+        </div>
+        <div class="verdict-info">
+            <h2 class="verdict-label">
+                {% if analysis.verdict == 'fake' %}
+                ⚠ Forgery Detected
+                {% else %}
+                ✓ Authentic Video
+                {% endif %}
+            </h2>
+            <p class="verdict-desc">
+                {% if analysis.verdict == 'fake' %}
+                This video appears to be manipulated. Suspicious regions are highlighted below.
+                {% else %}
+                This video appears to be authentic. No signs of manipulation were found.
+                {% endif %}
+            </p>
+            <div class="verdict-confidence">
+                <div class="confidence-ring">
+                    <svg viewBox="0 0 36 36" class="circular-chart">
+                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        <path class="circle-fill {{ analysis.verdict }}"
+                              stroke-dasharray="{{ analysis.confidence|pct }}, 100"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <span class="confidence-value">{{ analysis.confidence|pct|floatformat:0 }}%</span>
+                </div>
+                <span class="confidence-label">Confidence</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Statistics -->
+    <div class="stats-row">
+        <div class="stat-card" id="stat-total-frames">
+            <div class="stat-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="2" width="20" height="20" rx="2"/>
+                    <line x1="2" y1="8" x2="22" y2="8"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ analysis.total_frames_analyzed }}</span>
+                <span class="stat-label">Frames Analyzed</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-fake-frames">
+            <div class="stat-icon red">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ analysis.fake_frame_count }}</span>
+                <span class="stat-label">Suspicious Frames</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-real-frames">
+            <div class="stat-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ analysis.real_frame_count }}</span>
+                <span class="stat-label">Clean Frames</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-time">
+            <div class="stat-icon purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ analysis.processing_time_seconds|floatformat:1 }}s</span>
+                <span class="stat-label">Processing Time</span>
+            </div>
+        </div>
+    </div>
+
+    {% if analysis.verdict == 'fake' and analysis.screenshot %}
+    <!-- Main Evidence Screenshot -->
+    <div class="card" id="evidence-screenshot" style="margin-bottom: var(--space-xl);">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            Visual Evidence
+        </h2>
+        <p class="card-desc">Representative frame highlighting detected manipulation (arrow indicates forgery region).</p>
+        <div style="position: relative; border-radius: var(--border-radius-sm); overflow: hidden; border: 1px solid var(--color-border);">
+            <img src="{{ analysis.screenshot.url }}" alt="Forgery Screenshot" style="width: 100%; height: auto; display: block;">
+            <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 15px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); color: white;">
+                <p style="margin: 0; font-size: 14px; font-weight: 600;">Forgery detected with {{ analysis.confidence|pct|floatformat:1 }}% confidence.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Frame Analysis Chart -->
+    <div class="card" id="frame-chart">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Frame-by-Frame Analysis
+        </h2>
+        <div class="chart-container">
+            <canvas id="predictions-chart" width="800" height="300"></canvas>
+        </div>
+        <div class="chart-legend">
+            <div class="legend-item">
+                <span class="legend-color fake"></span>
+                <span>Suspicious (Score &gt; 0.5)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color real"></span>
+                <span>Clean (Score ≤ 0.5)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-line"></span>
+                <span>Threshold (0.5)</span>
+            </div>
+        </div>
+    </div>
+
+    {% if analysis.verdict == 'fake' and frame_regions %}
+    <!-- Forgery Regions -->
+    <div class="card" id="forgery-regions">
+        <h2 class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            Suspicious Regions Found
+        </h2>
+        <p class="card-desc">Red boxes highlight areas where manipulation was detected in the video frames.</p>
+
+        <div class="regions-gallery">
+            {% for fr in frame_regions %}
+            <div class="region-card" id="region-frame-{{ fr.frame_number }}">
+                <div class="region-header">
+                    <span class="region-frame-label">Frame #{{ fr.frame_number }}</span>
+                    <span class="region-count">{{ fr.regions|length }} region{{ fr.regions|length|pluralize }}</span>
+                </div>
+                <div class="region-comparison">
+                    <div class="comparison-item">
+                        <h5>Original Frame</h5>
+                        <img src="/media/{{ fr.original_frame }}" alt="Original frame {{ fr.frame_number }}" class="region-image">
+                    </div>
+                    <div class="comparison-item">
+                        <h5>Forgery Highlighted</h5>
+                        <img src="/media/{{ fr.annotated_frame }}" alt="Annotated frame {{ fr.frame_number }}" class="region-image">
+                    </div>
+                </div>
+                <div class="region-details">
+                    {% for region in fr.regions %}
+                    <div class="region-detail-item">
+                        <span class="region-type">{{ region.region_description }}</span>
+                        <span class="region-conf">Confidence: {{ region.confidence|pct|floatformat:0 }}%</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="results-actions">
+        <a href="{% url 'detect_forgery' %}" class="btn btn-outline" id="back-to-detect">
+            ← Back to Detection
+        </a>
+        <a href="{% url 'all_results' %}" class="btn btn-primary" id="all-results-btn">
+            View All Results
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Frame predictions chart
+const chartData = {{ chart_data|safe }};
+const canvas = document.getElementById('predictions-chart');
+if (canvas && chartData.labels.length > 0) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Clear
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw grid
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 10; i++) {
+        const y = padding.top + (chartHeight * i / 10);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+    }
+
+    // Threshold line at 0.5
+    const thresholdY = padding.top + chartHeight * 0.5;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, thresholdY);
+    ctx.lineTo(width - padding.right, thresholdY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw bars
+    const barWidth = Math.max(2, (chartWidth / chartData.labels.length) - 1);
+    chartData.scores.forEach((score, i) => {
+        const x = padding.left + (i * chartWidth / chartData.labels.length);
+        const barHeight = score * chartHeight;
+        const y = padding.top + chartHeight - barHeight;
+
+        // Use the color provided by the backend for this specific frame
+        ctx.fillStyle = chartData.colors[i] || (score > 0.5 ? '#ef4444' : '#22c55e');
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(x, y, barWidth, barHeight);
+        ctx.globalAlpha = 1;
+    });
+
+    // Y-axis labels
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 10; i++) {
+        const val = (10 - i) / 10;
+        const y = padding.top + (chartHeight * i / 10);
+        ctx.fillText(val.toFixed(1), padding.left - 8, y + 4);
+    }
+
+    // X-axis label
+    ctx.textAlign = 'center';
+    ctx.fillText('Frames →', width / 2, height - 5);
+
+    // Y-axis label
+    ctx.save();
+    ctx.translate(12, height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Forgery Score', 0, 0);
+    ctx.restore();
+}
+</script>
+{% endblock %}
