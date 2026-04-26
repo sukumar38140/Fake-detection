@@ -8,6 +8,8 @@ import time
 
 # Mock Django settings for standalone use
 if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    import sys
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     os.environ['DJANGO_SETTINGS_MODULE'] = 'forgery_project.settings'
     import django
     django.setup()
@@ -43,7 +45,7 @@ st.markdown("""
         font-weight: bold;
     }
     </style>
-    """, unsafe_allow_value=True)
+    """, unsafe_allow_html=True)
 
 st.title("🔍 DeepFake Detection Forensic Tool")
 st.markdown("---")
@@ -88,10 +90,10 @@ if uploaded_file is not None:
             confidence = results['confidence']
             
             if verdict == 'fake':
-                st.markdown(f"Verdict: <span class='verdict-fake'>FORGERY DETECTED</span>", unsafe_allow_value=True)
+                st.markdown(f"Verdict: <span class='verdict-fake'>FORGERY DETECTED</span>", unsafe_allow_html=True)
                 st.error(f"Confidence: {confidence:.2%}")
             else:
-                st.markdown(f"Verdict: <span class='verdict-real'>AUTHENTIC / REAL</span>", unsafe_allow_value=True)
+                st.markdown(f"Verdict: <span class='verdict-real'>AUTHENTIC / REAL</span>", unsafe_allow_html=True)
                 st.success(f"Confidence: {confidence:.2%}")
                 
             st.write(f"Frames Analyzed: {results['total_frames_analyzed']}")
@@ -102,8 +104,8 @@ if uploaded_file is not None:
         st.subheader("📊 Forensic Evidence (Frame-by-Frame)")
         
         # Plot score chart
-        scores = [f['score'] for f in results['frame_predictions']]
-        st.area_chart(scores)
+        st.write("Forgery Probability per Frame")
+        st.line_chart(scores)
         
         # Show Suspicious Frames
         if verdict == 'fake':
