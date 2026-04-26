@@ -2,13 +2,19 @@
 
 A professional-grade video forgery detection system using Deep CNN and LSTM architectures to identify manipulated content and localize forensic evidence.
 
-## 🚀 Deployment (Coolify / Docker)
+## 🚀 Deployment
 
-This project is container-ready. To deploy:
-1. Push to GitHub.
-2. Connect to **Coolify**.
-3. Set environment variables (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`).
-4. Deploy!
+### Option A: Professional Tool (Django + Docker)
+Deploy to **Coolify** or **Render**:
+1. Connect to GitHub.
+2. Set environment variables.
+3. Use the provided `Dockerfile`.
+
+### Option B: Quick Demo (Streamlit Cloud)
+Deploy to **Streamlit Cloud** for a free, instant demo:
+1. Connect to GitHub.
+2. Select `streamlit_app.py` as the main file.
+3. Deploy!
 
 ## 🛠️ Features
 - **Registration & Login**: Secure access for forensic analysts.
