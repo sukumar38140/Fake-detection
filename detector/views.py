@@ -439,8 +439,8 @@ def view_results(request, video_id):
         'scores': [],
         'colors': [],
     }
-    for fp in analysis.frame_predictions[:100]:  # Limit to 100 for chart
-        chart_data['labels'].append(f"F{fp['frame_index']}")
+    for i, fp in enumerate(analysis.frame_predictions[:100]):  # Limit to 100 for chart
+        chart_data['labels'].append(f"Frame {i+1}")
         chart_data['scores'].append(fp['score'])
         chart_data['colors'].append('#ff4444' if fp['prediction'] == 'fake' else '#44ff88')
 
@@ -516,7 +516,13 @@ def ajax_upload_video(request):
     # Get frame URLs for preview
     frame_urls = []
     if os.path.exists(output_dir):
-        files = sorted(os.listdir(output_dir))[:10]
+        # Explicit numeric sort to ensure 1, 2, ... 10 order
+        import re
+        files = os.listdir(output_dir)
+        # Filter only jpg files and sort by number found in filename
+        files = [f for f in files if f.endswith('.jpg')]
+        files.sort(key=lambda x: int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0)
+        files = files[:10]
         for f in files:
             frame_urls.append(f"{settings.MEDIA_URL}frames/{label_dir}/{video.id}/{f}")
 

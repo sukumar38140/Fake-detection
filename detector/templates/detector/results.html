@@ -174,7 +174,7 @@
             {% for fr in frame_regions %}
             <div class="region-card" id="region-frame-{{ fr.frame_number }}">
                 <div class="region-header">
-                    <span class="region-frame-label">Frame #{{ fr.frame_number }}</span>
+                    <span class="region-frame-label">Frame {{ forloop.counter }}</span>
                     <span class="region-count">{{ fr.regions|length }} region{{ fr.regions|length|pluralize }}</span>
                 </div>
                 <div class="region-comparison">

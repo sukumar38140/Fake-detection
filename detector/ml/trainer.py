@@ -57,13 +57,14 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
             video_path = video.video_path
             if os.path.exists(video_path):
                 try:
-                    result = extract_frames(video_path, output_dir=video.frames_dir, max_frames=10)
-                    frames = result['frames']  # Shape: (num_frames, H, W, 3)
+                    result = extract_frames(video_path, max_frames=10)
+                    frames = result['frames']
                     
-                    # Compute simple features from frames
-                    features = compute_frame_features(frames)
-                    X_list.append(features)
-                    y_list.append(0)  # 0 = real
+                    for frame in frames:
+                        # Compute features for THIS frame only
+                        features = compute_single_frame_features(frame)
+                        X_list.append(features)
+                        y_list.append(0)  # 0 = real
                 except Exception as e:
                     print(f"Warning: Could not process real video {video.id}: {e}")
                     continue
@@ -73,13 +74,14 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
             video_path = video.video_path
             if os.path.exists(video_path):
                 try:
-                    result = extract_frames(video_path, output_dir=video.frames_dir, max_frames=10)
+                    result = extract_frames(video_path, max_frames=10)
                     frames = result['frames']
                     
-                    # Compute simple features from frames
-                    features = compute_frame_features(frames)
-                    X_list.append(features)
-                    y_list.append(1)  # 1 = fake
+                    for frame in frames:
+                        # Compute features for THIS frame only
+                        features = compute_single_frame_features(frame)
+                        X_list.append(features)
+                        y_list.append(1)  # 1 = fake
                 except Exception as e:
                     print(f"Warning: Could not process fake video {video.id}: {e}")
                     continue
@@ -94,8 +96,12 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
         y = np.array(y_list)
         
         # Split data
+        test_size = validation_split
+        # Only stratify if we have enough samples of each class
+        stratify_data = y if (np.sum(y==0) >= 2 and np.sum(y==1) >= 2) else None
+        
         X_train, X_val, y_train, y_val = train_test_split(
-            X, y, test_size=validation_split, random_state=42, stratify=y if len(np.unique(y)) > 1 else None
+            X, y, test_size=test_size, random_state=42, stratify=stratify_data
         )
 
         training_session.total_videos = real_videos.count() + fake_videos.count()
@@ -148,36 +154,22 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
         raise
 
 
-def compute_frame_features(frames):
-    """
-    Compute simple statistical features from video frames.
+def compute_single_frame_features(frame):
+    """Compute statistical features from a single frame."""
+    # Mean color values
+    mean_r = np.mean(frame[:, :, 0])
+    mean_g = np.mean(frame[:, :, 1])
+    mean_b = np.mean(frame[:, :, 2])
     
-    Args:
-        frames: numpy array of shape (num_frames, H, W, 3)
+    # Standard deviation of color values
+    std_r = np.std(frame[:, :, 0])
+    std_g = np.std(frame[:, :, 1])
+    std_b = np.std(frame[:, :, 2])
     
-    Returns:
-        numpy array of computed features
-    """
-    features = []
+    # Brightness (average intensity)
+    brightness = np.mean(frame)
     
-    # Compute statistics across all frames
-    for frame in frames:
-        # Mean color values
-        mean_r = np.mean(frame[:, :, 0])
-        mean_g = np.mean(frame[:, :, 1])
-        mean_b = np.mean(frame[:, :, 2])
-        
-        # Standard deviation of color values
-        std_r = np.std(frame[:, :, 0])
-        std_g = np.std(frame[:, :, 1])
-        std_b = np.std(frame[:, :, 2])
-        
-        # Brightness (average intensity)
-        brightness = np.mean(frame)
-        
-        # Contrast (standard deviation of all pixels)
-        contrast = np.std(frame)
-        
-        features.extend([mean_r, mean_g, mean_b, std_r, std_g, std_b, brightness, contrast])
+    # Contrast (standard deviation of all pixels)
+    contrast = np.std(frame)
     
-    return np.array(features)
+    return np.array([mean_r, mean_g, mean_b, std_r, std_g, std_b, brightness, contrast])

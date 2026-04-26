@@ -10,7 +10,7 @@ import numpy as np
 from django.conf import settings
 
 from .frame_extractor import extract_frames
-from .trainer import compute_frame_features
+from .trainer import compute_single_frame_features
 
 
 # Global model cache to avoid reloading on every request
@@ -35,6 +35,8 @@ def get_model(model_path=None):
         model_path = str(getattr(settings, 'MODEL_FILE', os.path.join(str(model_dir), 'forgeryDetect_model.pkl')))
 
     if _cached_model is None or _cached_model_path != model_path:
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found at {model_path}. Please train a model first.")
         with open(model_path, 'rb') as f:
             _cached_model = pickle.load(f)
         _cached_model_path = model_path
@@ -48,9 +50,9 @@ def predict_video(video_path, model_path=None):
 
     Process:
     1. Extract frames from video
-    2. Compute statistical features from frames
-    3. Run RandomForest prediction
-    4. Return verdict with confidence
+    2. Compute features for EACH frame
+    3. Run RandomForest prediction on each frame
+    4. Average the results for a final verdict
 
     Args:
         video_path: Path to the video file
@@ -64,53 +66,48 @@ def predict_video(video_path, model_path=None):
     # Step 1: Extract frames
     extraction_result = extract_frames(video_path, max_frames=10)
     frames = extraction_result['frames']
+    frame_indices = extraction_result['frame_indices']
 
     if len(frames) == 0:
         raise ValueError("No frames could be extracted from the video.")
 
-    # Step 2: Compute features
-    features = compute_frame_features(frames)
-
-    # Step 3: Load model and predict
+    # Step 2: Load model
     model = get_model(model_path)
-    # The model expects a 2D array, so we wrap features in a list
-    prediction_proba = model.predict_proba([features])[0]
-    prediction = model.predict([features])[0]
 
-    # Step 4: Determine verdict
-    if prediction == 1:  # fake
-        verdict = 'fake'
-        confidence = float(prediction_proba[1])
-    else:  # real
-        verdict = 'real'
-        confidence = float(prediction_proba[0])
-
-    processing_time = time.time() - start_time
-
-    # Create frame-level predictions
+    # Step 3: Compute features and predict for each frame
     frame_predictions = []
-    frame_indices = extraction_result['frame_indices']
     
-    # Consistency for the chart: score should be probability of being 'fake'
-    forgery_score = float(prediction_proba[1])
-    
-    for i, frame_idx in enumerate(frame_indices):
-        # Distribute the prediction across frames
+    for i, frame in enumerate(frames):
+        features = compute_single_frame_features(frame)
+        # Get probability of 'fake' (class 1)
+        # model.predict_proba returns [[prob_real, prob_fake]]
+        probs = model.predict_proba([features])[0]
+        prob_fake = float(probs[1])
+        
         frame_predictions.append({
-            'frame_index': frame_idx,
-            'prediction': 'fake' if forgery_score > 0.5 else 'real',
-            'score': forgery_score,
+            'frame_index': frame_indices[i],
+            'score': prob_fake,
+            'prediction': 'fake' if prob_fake > 0.5 else 'real'
         })
+
+    # Step 4: Aggregate results
+    avg_fake_score = sum(p['score'] for p in frame_predictions) / len(frame_predictions)
+    
+    verdict = 'fake' if avg_fake_score > 0.5 else 'real'
+    # Confidence is the probability of the chosen verdict
+    confidence = avg_fake_score if verdict == 'fake' else (1 - avg_fake_score)
+    
+    processing_time = time.time() - start_time
 
     return {
         'verdict': verdict,
         'confidence': confidence,
-        'avg_score': confidence,
+        'avg_score': avg_fake_score,
         'total_frames_analyzed': len(frame_predictions),
-        'fake_frame_count': len(frame_predictions) if verdict == 'fake' else 0,
-        'real_frame_count': len(frame_predictions) if verdict == 'real' else 0,
+        'fake_frame_count': sum(1 for p in frame_predictions if p['prediction'] == 'fake'),
+        'real_frame_count': sum(1 for p in frame_predictions if p['prediction'] == 'real'),
         'frame_predictions': frame_predictions,
-        'sequence_predictions': [],  # Not applicable for RF
+        'sequence_predictions': [],  # Not used in RF
         'processing_time': processing_time,
         'raw_frames': frames,
         'frame_indices': frame_indices,
@@ -120,6 +117,12 @@ def predict_video(video_path, model_path=None):
 def predict_single_frame(frame, model_path=None):
     """
     Predict on a single frame (for debugging/visualization).
-    Not implemented for RandomForest model as it expects video-level features.
     """
-    raise NotImplementedError("Single frame prediction not supported with RandomForest model.")
+    model = get_model(model_path)
+    features = compute_single_frame_features(frame)
+    probs = model.predict_proba([features])[0]
+    return {
+        'verdict': 'fake' if probs[1] > 0.5 else 'real',
+        'confidence': float(max(probs)),
+        'score': float(probs[1])
+    }
