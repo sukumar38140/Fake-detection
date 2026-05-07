@@ -12,7 +12,7 @@
     <div style="display: flex; gap: 32px; justify-content: center;">
         <!-- Fake Video Upload -->
         <div class="card" style="flex:1;">
-            <h3 style="text-align:center; color:#e53e3e;">Upload Fake Video</h3>
+            <h3 style="text-align:center; color: var(--color-danger);">Upload Fake Video</h3>
             <form method="POST" enctype="multipart/form-data" id="fake-upload-form">
                 {% csrf_token %}
                 <input type="hidden" name="video_type" value="fake">
@@ -30,7 +30,7 @@
                 </div>
             </form>
             <div id="fake-preview" style="margin-top:20px; display:none;">
-                <h4 style="color:#e53e3e; font-size:12px; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;">Captured Forgery Frames</h4>
+                <h4 style="color: var(--color-danger); font-size:12px; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;">Captured Forgery Frames</h4>
                 <div class="frame-preview-grid" id="fake-frames-grid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:5px;">
                     <!-- Frames will be injected here -->
                 </div>
@@ -38,7 +38,7 @@
         </div>
         <!-- Real Video Upload -->
         <div class="card" style="flex:1;">
-            <h3 style="text-align:center; color:#38a169;">Upload Real Video</h3>
+            <h3 style="text-align:center; color: var(--color-success);">Upload Real Video</h3>
             <form method="POST" enctype="multipart/form-data" id="real-upload-form">
                 {% csrf_token %}
                 <input type="hidden" name="video_type" value="real">
@@ -56,7 +56,7 @@
                 </div>
             </form>
             <div id="real-preview" style="margin-top:20px; display:none;">
-                <h4 style="color:#38a169; font-size:12px; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;">Captured Authentic Frames</h4>
+                <h4 style="color: var(--color-success); font-size:12px; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;">Captured Authentic Frames</h4>
                 <div class="frame-preview-grid" id="real-frames-grid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:5px;">
                     <!-- Frames will be injected here -->
                 </div>
@@ -67,8 +67,8 @@
     <!-- Step 2: Model Trained Dialog (shown after both uploads) -->
     <div id="model-trained-dialog" style="display:none; text-align:center; margin-top:40px;">
         <div class="card" style="max-width:400px; margin:0 auto;">
-            <h3 style="color:#4f46e5;">Model is trained!</h3>
-            <p>You can now test a video to see if it is Fake or Real.</p>
+            <h3 style="color: var(--color-primary);">Model is trained!</h3>
+            <p style="color: var(--color-text-secondary);">You can now test a video to see if it is Fake or Real.</p>
         </div>
     </div>
 
@@ -209,11 +209,11 @@ async function checkUploads() {
             
             dialog.innerHTML = `
                 <div class="card" style="max-width:400px; margin:0 auto;">
-                    <h3 style="color:#f59e0b;">Training Model...</h3>
-                    <p>Please wait while the model trains on the uploaded videos.</p>
+                    <h3 style="color: var(--color-warning);">Training Model...</h3>
+                    <p style="color: var(--color-text-secondary);">Please wait while the model trains on the uploaded videos.</p>
                     <div style="margin-top:15px;">
-                        <div style="width: 100%; background: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
-                            <div style="width: 50%; background: #f59e0b; height: 100%; animation: pulse 1s infinite alternate;"></div>
+                        <div style="width: 100%; background: var(--color-bg-secondary); border-radius: 4px; height: 8px; overflow: hidden;">
+                            <div style="width: 50%; background: var(--color-warning); height: 100%; animation: pulse 1s infinite alternate;"></div>
                         </div>
                     </div>
                 </div>
@@ -309,13 +309,13 @@ document.getElementById('test-upload-form').onsubmit = async function(e) {
             const labelEl = document.getElementById('test-result-label');
             
             labelEl.innerText = isFake ? 'Fake Video' : 'Real Video';
-            labelEl.style.color = isFake ? '#e53e3e' : '#38a169';
+            labelEl.style.color = isFake ? 'var(--color-danger)' : 'var(--color-success)';
             
             let messageHtml = '';
             if (isFake && data.annotated_frame_url) {
-                messageHtml += `<img src="${data.annotated_frame_url}" alt="Fake Detection Screenshot" style="width:100%; border-radius: 8px; margin-bottom: 15px; border: 2px solid #e53e3e;" />`;
+                messageHtml += `<img src="${data.annotated_frame_url}" alt="Fake Detection Screenshot" style="width:100%; border-radius: 8px; margin-bottom: 15px; border: 2px solid var(--color-danger);" />`;
             }
-            messageHtml += `<p>Video is detected as ${isFake ? 'FAKE' : 'REAL'} (Confidence: ${(data.confidence * 100).toFixed(1)}%)</p>`;
+            messageHtml += `<p style="color: var(--color-text-secondary);">Video is detected as ${isFake ? 'FAKE' : 'REAL'} (Confidence: ${(data.confidence * 100).toFixed(1)}%)</p>`;
             
             document.getElementById('test-result-message').innerHTML = messageHtml;
             // Removed form.reset() to keep data

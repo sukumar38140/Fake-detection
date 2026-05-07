@@ -18,6 +18,10 @@
         </h2>
         <form method="POST" enctype="multipart/form-data" class="upload-form" id="upload-form">
             {% csrf_token %}
+            {% if request.GET.type == 'test' %}
+                {{ form.title.as_hidden }}
+                {{ form.video_type.as_hidden }}
+            {% else %}
             <div class="form-grid">
                 <div class="form-group">
                     <label for="video-title" class="form-label">Video Title</label>
@@ -29,7 +33,9 @@
                     <span class="form-hint">Sample videos are used for training. Test videos are used for detection.</span>
                 </div>
             </div>
+            {% endif %}
 
+            {% if request.GET.type != 'test' %}
             <div class="form-grid">
                 <div class="form-group">
                     <label for="video-label" class="form-label">Label</label>
@@ -37,6 +43,9 @@
                     <span class="form-hint">For sample videos: Mark as Real or Fake so the model can learn from it. For test videos: This is optional.</span>
                 </div>
             </div>
+            {% else %}
+                {{ form.label.as_hidden }}
+            {% endif %}
 
             <div class="form-group">
                 <label class="form-label">Video File</label>
@@ -180,11 +189,11 @@
                         <td>{{ video.frame_count }}</td>
                         <td>
                             {% if video.status == 'analyzed' and video.result %}
-                            <span class="verdict-badge {% if video.result.verdict == 'fake' %}fake{% else %}real{% endif %}" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: {% if video.result.verdict == 'fake' %}#ffe5e5; color: #dc3545;{% else %}#e5f5ed; color: #28a745;{% endif %}">
+                            <span class="verdict-badge {% if video.result.verdict == 'fake' %}fake{% else %}real{% endif %}" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: {% if video.result.verdict == 'fake' %}var(--color-danger-bg); color: var(--color-danger);{% else %}var(--color-success-bg); color: var(--color-success);{% endif %}">
                                 {{ video.result.verdict|upper }}
                             </span>
                             {% else %}
-                            <span style="color: #999;">-</span>
+                            <span style="color: var(--color-text-tertiary);">-</span>
                             {% endif %}
                         </td>
                         <td>
@@ -272,9 +281,12 @@
         const progressDiv = document.getElementById('upload-progress');
         const progressFill = document.getElementById('progress-fill');
         const progressText = document.getElementById('progress-text');
-        const videosTableBody = document.querySelector('.results-table tbody');
-        const emptyState = document.querySelector('#videos-list .empty-state');
-        const tableWrapper = document.querySelector('.results-table-wrapper');
+        const sampleTableBody = document.querySelector('#sample-videos-section .results-table tbody');
+        const sampleEmptyState = document.querySelector('#sample-videos-section .empty-state');
+        const sampleTableWrapper = document.querySelector('#sample-videos-section .results-table-wrapper');
+        const testTableBody = document.querySelector('#test-videos-section .results-table tbody');
+        const testEmptyState = document.querySelector('#test-videos-section .empty-state');
+        const testTableWrapper = document.querySelector('#test-videos-section .results-table-wrapper');
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         uploadForm.addEventListener('submit', async function(e) {
@@ -369,7 +381,7 @@
         });
         
         // Delegation for delete
-        document.querySelector('#videos-list').addEventListener('click', async function(e) {
+        document.body.addEventListener('click', async function(e) {
             if (e.target.classList.contains('delete-btn')) {
                 if (!confirm('Are you sure you want to delete this video?')) return;
                 
@@ -410,7 +422,7 @@
         });
         
         // Delegation for label update
-        document.querySelector('#videos-list').addEventListener('change', async function(e) {
+        document.body.addEventListener('change', async function(e) {
             if (e.target.classList.contains('label-select')) {
                 const select = e.target;
                 const videoId = select.getAttribute('data-id');
@@ -438,6 +450,21 @@
                 } finally {
                     select.disabled = false;
                 }
+            }
+        });
+        
+        // Auto-trigger file dialog if requested
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('auto') === 'true' && fileInput) {
+            fileInput.click();
+        }
+        
+        // Auto-fill title from filename if empty
+        fileInput.addEventListener('change', function() {
+            const titleInput = document.getElementById('video-title');
+            if (titleInput && !titleInput.value && this.files.length > 0) {
+                const name = this.files[0].name.split('.').slice(0, -1).join('.');
+                titleInput.value = name;
             }
         });
     });

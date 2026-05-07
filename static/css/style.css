@@ -744,8 +744,7 @@ body.no-sidebar .main-content {
 }
 
 .results-table thead th {
-    text-align: left;
-    padding: var(--space-md) var(--space-base);
+    padding: var(--space-sm) var(--space-md);
     font-size: var(--font-size-xs);
     font-weight: 600;
     color: var(--color-text-tertiary);
@@ -756,10 +755,11 @@ body.no-sidebar .main-content {
 }
 
 .results-table tbody td {
-    padding: var(--space-md) var(--space-base);
+    padding: var(--space-md) var(--space-md);
     font-size: var(--font-size-sm);
     border-bottom: 1px solid var(--color-border);
     color: var(--color-text-secondary);
+    vertical-align: middle;
 }
 
 .results-table tbody tr {
@@ -794,6 +794,34 @@ body.no-sidebar .main-content {
     background: var(--color-danger-bg);
     color: var(--color-danger);
     border: 1px solid rgba(239, 68, 68, 0.2);
+    white-space: nowrap;
+}
+
+/* Actions Column Fix */
+.results-table th:last-child,
+.results-table td:last-child {
+    text-align: right;
+    min-width: 140px;
+    position: sticky;
+    right: 0;
+    background: inherit;
+    z-index: 10;
+}
+
+.results-table tr:hover td:last-child {
+    background: var(--color-bg-elevated);
+}
+
+.results-table th:last-child::before,
+.results-table td:last-child::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    background: linear-gradient(to right, transparent, rgba(0,0,0,0.1));
+    pointer-events: none;
 }
 
 .verdict-badge.real {

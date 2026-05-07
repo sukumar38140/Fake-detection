@@ -24,6 +24,7 @@ class Video(models.Model):
         ('test', 'Test (for detection)'),
     ]
 
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
     video_file = models.FileField(upload_to='inputvideos/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -51,6 +52,34 @@ class Video(models.Model):
     def video_path(self):
         """Full path to the video file."""
         return os.path.join(settings.MEDIA_ROOT, str(self.video_file))
+
+    @property
+    def video_type_display(self):
+        return dict(self.VIDEO_TYPE_CHOICES).get(self.video_type, self.video_type.title())
+
+
+class UserProfile(models.Model):
+    """Stores extra settings and preferences for each user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
+    display_name = models.CharField(max_length=150, blank=True)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    preferred_frame_sample_rate = models.PositiveSmallIntegerField(default=5)
+    preferred_validation_split = models.FloatField(default=0.2)
+    detection_threshold = models.FloatField(default=0.5)
+    show_heatmap = models.BooleanField(default=False)
+    email_notifications = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile for {self.user.username}"
+
+    @property
+    def avatar_url(self):
+        if self.avatar and hasattr(self.avatar, 'url'):
+            return self.avatar.url
+        return f"https://ui-avatars.com/api/?name={self.user.username}&background=6366f1&color=fff"
 
 
 class AnalysisResult(models.Model):
@@ -115,6 +144,7 @@ class TrainingSession(models.Model):
         ('failed', 'Failed'),
     ]
 
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

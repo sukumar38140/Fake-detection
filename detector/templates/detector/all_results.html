@@ -21,15 +21,13 @@
             <table class="results-table">
                 <thead>
                     <tr>
-                        <th>Video</th>
+                        <th style="min-width: 150px;">Video</th>
                         <th>Verdict</th>
-                        <th>Confidence</th>
-                        <th>Frames Analyzed</th>
-                        <th>Fake Frames</th>
-                        <th>Real Frames</th>
-                        <th>Processing Time</th>
+                        <th style="min-width: 120px;">Confidence</th>
+                        <th title="Total / Fake / Real">Frames (T/F/R)</th>
+                        <th>Proc. Time</th>
                         <th>Analyzed At</th>
-                        <th>Actions</th>
+                        <th style="text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,12 +36,12 @@
                         <td class="video-name">
                             <div style="font-weight: 600; margin-bottom: 5px;">{{ result.video.title }}</div>
                             {% if result.verdict == 'fake' and result.regions.first %}
-                            <img src="{{ result.regions.first.annotated_frame.url }}" alt="Screenshot" style="width: 120px; border-radius: 4px; border: 1px solid #e53e3e;" />
+                            <img src="{{ result.regions.first.annotated_frame.url }}" alt="Screenshot" style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--color-danger);" />
                             {% endif %}
                         </td>
                         <td>
                             <span class="verdict-badge {% if result.verdict == 'fake' %}fake{% else %}real{% endif %}">
-                                Video is detected as {{ result.verdict|upper }}
+                                {{ result.verdict|upper }}
                             </span>
                         </td>
                         <td>
@@ -53,12 +51,16 @@
                                 <span class="confidence-text">{{ result.confidence|pct|floatformat:1 }}%</span>
                             </div>
                         </td>
-                        <td>{{ result.total_frames_analyzed }}</td>
-                        <td class="{% if result.fake_frame_count > 0 %}text-danger{% endif %}">{{ result.fake_frame_count }}</td>
-                        <td class="{% if result.real_frame_count > 0 %}text-success{% endif %}">{{ result.real_frame_count }}</td>
-                        <td>{{ result.processing_time_seconds|floatformat:1 }}s</td>
-                        <td>{{ result.analyzed_at|date:"M d, Y H:i" }}</td>
                         <td>
+                            <div style="font-size: var(--font-size-xs);">
+                                <span style="color: var(--color-text-primary)">{{ result.total_frames_analyzed }}</span> / 
+                                <span class="text-danger">{{ result.fake_frame_count }}</span> / 
+                                <span class="text-success">{{ result.real_frame_count }}</span>
+                            </div>
+                        </td>
+                        <td>{{ result.processing_time_seconds|floatformat:1 }}s</td>
+                        <td style="font-size: var(--font-size-xs); line-height: 1.2;">{{ result.analyzed_at|date:"M d, Y" }}<br>{{ result.analyzed_at|date:"H:i" }}</td>
+                        <td style="text-align: right;">
                             <a href="{% url 'view_results' result.video.id %}" class="btn btn-sm btn-primary" id="view-result-{{ result.id }}">
                                 View Details
                             </a>

@@ -180,11 +180,12 @@
                 <div class="region-comparison">
                     <div class="comparison-item">
                         <h5>Original Frame</h5>
-                        <img src="/media/{{ fr.original_frame }}" alt="Original frame {{ fr.frame_number }}" class="region-image">
+                        <img src="{{ fr.original_frame.url }}" alt="Original frame {{ fr.frame_number }}" class="region-image">
+                        <div class="region-label original">Original</div>
                     </div>
                     <div class="comparison-item">
                         <h5>Forgery Highlighted</h5>
-                        <img src="/media/{{ fr.annotated_frame }}" alt="Annotated frame {{ fr.frame_number }}" class="region-image">
+                        <img src="{{ fr.annotated_frame.url }}" alt="Annotated frame {{ fr.frame_number }}" class="region-image">
                     </div>
                 </div>
                 <div class="region-details">

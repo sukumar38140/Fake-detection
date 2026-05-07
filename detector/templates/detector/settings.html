@@ -1,0 +1,185 @@
+{% extends "detector/base.html" %}
+{% load static %}
+
+{% block title %}System Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block page_subtitle %}Configure detection parameters and preferences{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="dashboard-columns">
+        <!-- Detection Settings -->
+        <div class="card">
+            <h2 class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Detection Pipeline
+            </h2>
+            <p class="card-desc">Fine-tune the ML model behavior and processing parameters.</p>
+            
+            <form method="post" class="settings-form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">Forgery Detection Threshold</label>
+                    <div class="range-container">
+                        {{ form.detection_threshold }}
+                        <span class="range-value" id="threshold-val">{{ profile.detection_threshold }}</span>
+                    </div>
+                    <p class="form-help">Minimum confidence required to flag a frame as 'Fake'. Lower values increase sensitivity.</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Frame Sample Rate</label>
+                    {{ form.preferred_frame_sample_rate }}
+                    <p class="form-help">Number of frames to extract per second of video. Higher values improve accuracy but take longer.</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Validation Split (Training)</label>
+                    {{ form.preferred_validation_split }}
+                    <p class="form-help">Percentage of data kept for validating model performance.</p>
+                </div>
+
+                <div class="checkbox-group">
+                    {{ form.show_heatmap }}
+                    <label for="id_show_heatmap">Show Heatmaps in Results</label>
+                </div>
+
+                <div class="checkbox-group">
+                    {{ form.email_notifications }}
+                    <label for="id_email_notifications">Enable Email Notifications</label>
+                </div>
+
+                <div class="form-actions" style="margin-top: var(--space-xl);">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- System Actions -->
+        <div class="card">
+            <h2 class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                Model Management
+            </h2>
+            <p class="card-desc">Manage the trained ML model file and system cache.</p>
+            
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <span class="action-name">Trained Model File</span>
+                        <span class="action-status {% if model_exists %}ready{% else %}not-ready{% endif %}">
+                            {% if model_exists %}Found (forgeryDetect_model.pkl){% else %}Not Found{% endif %}
+                        </span>
+                    </div>
+                    {% if model_exists %}
+                    <form action="{% url 'settings' %}" method="post" onsubmit="return confirm('Are you sure you want to delete the trained model? This cannot be undone.')">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_model" value="true">
+                        <button type="submit" class="btn-icon btn-danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                <div class="action-item">
+                    <div class="action-info">
+                        <span class="action-name">Temporary Frames Cache</span>
+                        <span class="action-status">~{{ cache_size|default:"0" }} MB used</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline">Clear Cache</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-lg);
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+    .form-label {
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        color: var(--color-text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .form-help {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+        margin-top: 4px;
+    }
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+    }
+    .action-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-base);
+    }
+    .action-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-md);
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius-sm);
+    }
+    .action-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .action-name {
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: var(--color-text-primary);
+    }
+    .action-status {
+        font-size: var(--font-size-xs);
+    }
+    .action-status.ready { color: var(--color-success); }
+    .action-status.not-ready { color: var(--color-warning); }
+    
+    .btn-icon {
+        background: none;
+        border: 1px solid var(--color-border);
+        padding: 8px;
+        border-radius: var(--border-radius-xs);
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        transition: all var(--transition-fast);
+    }
+    .btn-icon:hover {
+        background: var(--color-bg-card);
+        color: var(--color-text-primary);
+    }
+    .btn-danger:hover {
+        background: var(--color-danger-bg);
+        color: var(--color-danger);
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+</style>
+{% endblock %}

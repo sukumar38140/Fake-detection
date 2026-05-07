@@ -1,3 +1,4 @@
+
 @echo off
 echo Starting ForgeGuard AI (Video Forgery Detector)...
 echo.

@@ -1,4 +1,5 @@
 {% extends "detector/base.html" %}
+{% load detector_filters %}
 
 {% block title %}Detect Forgery{% endblock %}
 {% block page_title %}Detect Forgery{% endblock %}
@@ -58,28 +59,28 @@
 
             <!-- Analysis Result Display -->
             {% if video.result %}
-            <div class="analysis-result-preview" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div class="analysis-result-preview" style="margin-top: 20px; padding: 15px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 8px;">
                 <div class="verdict-summary">
                     {% if video.result.verdict == 'fake' %}
-                    <div style="color: #dc3545; font-weight: 600; font-size: 16px;">
+                    <div style="color: var(--color-danger); font-weight: 600; font-size: 16px;">
                         ⚠️ FORGERY DETECTED
                     </div>
-                    <p style="margin-top: 8px; color: #666;">This video appears to be manipulated.</p>
+                    <p style="margin-top: 8px; color: var(--color-text-secondary);">This video appears to be manipulated.</p>
                     {% else %}
-                    <div style="color: #28a745; font-weight: 600; font-size: 16px;">
+                    <div style="color: var(--color-success); font-weight: 600; font-size: 16px;">
                         ✓ AUTHENTIC VIDEO
                     </div>
-                    <p style="margin-top: 8px; color: #666;">This video appears to be authentic.</p>
+                    <p style="margin-top: 8px; color: var(--color-text-secondary);">This video appears to be authentic.</p>
                     {% endif %}
                 </div>
                 <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
                     <div>
-                        <span style="color: #666;">Confidence:</span>
-                        <span style="font-weight: 600; margin-left: 5px;">{{ video.result.confidence|floatformat:1 }}%</span>
+                        <span style="color: var(--color-text-tertiary);">Confidence:</span>
+                        <span style="font-weight: 600; margin-left: 5px; color: var(--color-text-primary);">{{ video.result.confidence|pct|floatformat:1 }}%</span>
                     </div>
                     <div>
-                        <span style="color: #666;">Suspicious Frames:</span>
-                        <span style="font-weight: 600; margin-left: 5px;">{{ video.result.fake_frame_count }} / {{ video.result.total_frames_analyzed }}</span>
+                        <span style="color: var(--color-text-tertiary);">Suspicious Frames:</span>
+                        <span style="font-weight: 600; margin-left: 5px; color: var(--color-text-primary);">{{ video.result.fake_frame_count }} / {{ video.result.total_frames_analyzed }}</span>
                     </div>
                 </div>
             </div>
@@ -109,8 +110,9 @@
                 {% endif %}
             </div>
             {% else %}
-            <div style="margin-top: 20px; padding: 20px; text-align: center; background: #f8f9fa; border-radius: 8px;">
-                <p style="color: #666; margin-bottom: 15px;">No analysis results yet. Click "Run Analysis" to detect forgery.</p>
+            <div style="margin-top: 20px; padding: 20px; text-align: center; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 8px;">
+                <h4 style="color: var(--color-danger); font-size:12px; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;">Captured Forgery Frames</h4>
+                <p style="color: var(--color-text-secondary); margin-bottom: 15px;">No analysis results yet. Click "Run Analysis" to detect forgery.</p>
                 {% if model_exists and video.status != 'processing' %}
                 <a href="{% url 'run_detection' video.id %}" class="btn btn-primary" id="run-detect-btn"
                    onclick="this.innerHTML='<span class=\'spinner\'></span> Analyzing...'; this.style.pointerEvents='none'; this.style.opacity='0.7';">
@@ -132,9 +134,10 @@
                 <polygon points="23 7 16 12 23 17 23 7"/>
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
             </svg>
-            <p style="font-size: 16px; color: #666; margin-bottom: 15px;">No test video uploaded yet.</p>
-            <p style="color: #999; margin-bottom: 20px;">Upload a video to check if it's real or fake.</p>
-            <a href="{% url 'upload_video' %}" class="btn btn-primary" id="upload-first-btn">Upload Test Video</a>
+            <h3 style="text-align:center; color: var(--color-danger);">Upload Fake Video</h3>
+            <p style="font-size: 16px; color: var(--color-text-secondary); margin-bottom: 15px;">No test video uploaded yet.</p>
+            <p style="color: var(--color-text-tertiary); margin-bottom: 20px;">Upload a video to check if it's real or fake.</p>
+            <a href="{% url 'upload_video' %}?type=test&auto=true" class="btn btn-primary" id="upload-first-btn">Upload Test Video</a>
         </div>
         {% endif %}
     </div>

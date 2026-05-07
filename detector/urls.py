@@ -17,6 +17,8 @@ urlpatterns = [
     path('detect/run/<int:video_id>/', views.run_detection, name='run_detection'),
     path('results/<int:video_id>/', views.view_results, name='view_results'),
     path('results/', views.all_results, name='all_results'),
+    path('settings/', views.settings_view, name='settings'),
+    path('profile/', views.profile, name='profile'),
     
     # AJAX endpoints for interactive train workflow
     path('ajax/upload/', views.ajax_upload_video, name='ajax_upload_video'),

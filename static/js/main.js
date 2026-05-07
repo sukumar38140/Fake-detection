@@ -125,3 +125,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+// ── Session & Cache Cleanup ──
+function handleLogout(event) {
+    // Clear all client-side state
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear cookies if possible (optional, as server handles logout)
+    document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+    
+    console.log('Session data cleared locally.');
+}
+
+// Attach logout handler to logout links
+document.addEventListener('DOMContentLoaded', function() {
+    const logoutLinks = document.querySelectorAll('a[href*="logout"]');
+    logoutLinks.forEach(link => {
+        link.addEventListener('click', handleLogout);
+    });
+});

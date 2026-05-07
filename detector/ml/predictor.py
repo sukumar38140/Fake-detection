@@ -13,50 +13,26 @@ from .frame_extractor import extract_frames
 from .trainer import compute_single_frame_features
 
 
-# Global model cache to avoid reloading on every request
-_cached_model = None
-_cached_model_path = None
-
-
-def get_model(model_path=None):
+def get_model(model_path):
     """
-    Get the trained model (cached for performance).
-
-    Args:
-        model_path: Path to the model file
-
-    Returns:
-        Loaded scikit-learn model
+    Get the trained model.
     """
-    global _cached_model, _cached_model_path
-
-    if model_path is None:
-        model_dir = getattr(settings, 'ML_MODELS_DIR', os.path.join(settings.BASE_DIR, 'ml_models'))
-        model_path = str(getattr(settings, 'MODEL_FILE', os.path.join(str(model_dir), 'forgeryDetect_model.pkl')))
-
-    if _cached_model is None or _cached_model_path != model_path:
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found at {model_path}. Please train a model first.")
-        with open(model_path, 'rb') as f:
-            _cached_model = pickle.load(f)
-        _cached_model_path = model_path
-
-    return _cached_model
+    if not model_path or not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found. Please train a model first.")
+    
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+    return model
 
 
-def predict_video(video_path, model_path=None):
+def predict_video(video_path, model_path=None, max_frames=None):
     """
     Run forgery detection on a video file using RandomForest classifier.
-
-    Process:
-    1. Extract frames from video
-    2. Compute features for EACH frame
-    3. Run RandomForest prediction on each frame
-    4. Average the results for a final verdict
 
     Args:
         video_path: Path to the video file
         model_path: Path to the trained model
+        max_frames: Maximum number of frames to analyze
 
     Returns:
         dict with prediction results
@@ -64,7 +40,10 @@ def predict_video(video_path, model_path=None):
     start_time = time.time()
 
     # Step 1: Extract frames
-    extraction_result = extract_frames(video_path, max_frames=10)
+    if max_frames is None:
+        max_frames = 10
+        
+    extraction_result = extract_frames(video_path, max_frames=max_frames)
     frames = extraction_result['frames']
     frame_indices = extraction_result['frame_indices']
 

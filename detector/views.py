@@ -6,10 +6,13 @@ import os
 import time
 import json
 import traceback
+import shutil
+import re
+import cv2
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate, logout
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import login, authenticate, logout, update_session_auth_hash
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.contrib import messages
@@ -17,8 +20,18 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
-from .models import Video, AnalysisResult, ForgeryRegion, TrainingSession
-from .forms import VideoUploadForm, TrainingConfigForm
+from .models import Video, AnalysisResult, ForgeryRegion, TrainingSession, UserProfile
+from .forms import (
+    UserRegistrationForm,
+    VideoUploadForm,
+    TrainingConfigForm,
+    ProfileForm,
+    UserSettingsForm,
+)
+from .ml.frame_extractor import get_video_info, extract_frames
+from .ml.trainer import train_model as run_training
+from .ml.predictor import predict_video
+from .ml.region_detector import detect_forgery_regions, annotate_frame
 
 
 def register_user(request):
@@ -26,7 +39,7 @@ def register_user(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
+        form = UserRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
             login(request, user)
@@ -37,7 +50,7 @@ def register_user(request):
                 for error in errors:
                     messages.error(request, f"{field}: {error}")
     else:
-        form = UserCreationForm()
+        form = UserRegistrationForm()
     return render(request, 'detector/register.html', {'form': form})
 
 
@@ -73,26 +86,25 @@ def logout_user(request):
 def dashboard(request):
     """Main dashboard with system overview and statistics."""
     # Stats for sample videos (used for training)
-    sample_videos = Video.objects.filter(video_type='sample')
+    sample_videos = Video.objects.filter(video_type='sample', user=request.user)
     total_samples = sample_videos.count()
     real_samples = sample_videos.filter(label='real').count()
     fake_samples = sample_videos.filter(label='fake').count()
     
     # Stats for test videos (used for detection)
-    test_videos = Video.objects.filter(video_type='test')
+    test_videos = Video.objects.filter(video_type='test', user=request.user)
     total_tests = test_videos.count()
     
     # Analysis results from test videos only
-    analyzed_tests = AnalysisResult.objects.filter(video__video_type='test').count()
-    fake_detected = AnalysisResult.objects.filter(video__video_type='test', verdict='fake').count()
-    real_detected = AnalysisResult.objects.filter(video__video_type='test', verdict='real').count()
+    analyzed_tests = AnalysisResult.objects.filter(video__video_type='test', video__user=request.user).count()
+    fake_detected = AnalysisResult.objects.filter(video__video_type='test', verdict='fake', video__user=request.user).count()
+    real_detected = AnalysisResult.objects.filter(video__video_type='test', verdict='real', video__user=request.user).count()
     
-    training_sessions = TrainingSession.objects.count()
-    latest_session = TrainingSession.objects.first()
+    training_sessions = TrainingSession.objects.filter(user=request.user).count()
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
 
-    # Check if model exists
-    model_path = str(getattr(settings, 'MODEL_FILE', ''))
-    model_exists = os.path.exists(model_path) if model_path else False
+    # Check if user has a trained model
+    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
 
     # Get current test video (last uploaded)
     current_test_video = test_videos.order_by('-uploaded_at').first()
@@ -101,7 +113,7 @@ def dashboard(request):
         current_result = AnalysisResult.objects.filter(video=current_test_video).first()
 
     # Recent analysis results from test videos
-    recent_results = AnalysisResult.objects.filter(video__video_type='test').select_related('video').all()[:5]
+    recent_results = AnalysisResult.objects.filter(video__video_type='test', video__user=request.user).select_related('video').all()[:5]
 
     context = {
         'total_samples': total_samples,
@@ -128,6 +140,11 @@ def upload_video(request):
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
             video = form.save(commit=False)
+            video.user = request.user
+            
+            # Use filename if title is empty
+            if not video.title:
+                video.title = request.FILES['video_file'].name.split('.')[0]
 
             # Calculate file size
             video_file = request.FILES['video_file']
@@ -136,13 +153,12 @@ def upload_video(request):
 
             # Extract video metadata using OpenCV
             try:
-                from .ml.frame_extractor import get_video_info
                 info = get_video_info(video.video_path)
                 video.frame_count = info['total_frames']
                 video.duration_seconds = info['duration']
                 video.save()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Metadata extraction failed: {str(e)}")
 
             video_type_display = 'Sample' if video.video_type == 'sample' else 'Test'
             messages.success(request, f'{video_type_display} video "{video.title}" uploaded successfully! ({video.file_size_mb:.1f} MB)')
@@ -152,8 +168,8 @@ def upload_video(request):
         form = VideoUploadForm(initial={'video_type': video_type})
 
     # Separate sample and test videos
-    sample_videos = Video.objects.filter(video_type='sample')
-    test_videos = Video.objects.filter(video_type='test')
+    sample_videos = Video.objects.filter(video_type='sample', user=request.user)
+    test_videos = Video.objects.filter(video_type='test', user=request.user)
     labeled_sample_count = sample_videos.exclude(label='unlabeled').count()
 
     context = {
@@ -165,18 +181,104 @@ def upload_video(request):
     return render(request, 'detector/upload.html', context)
 
 
+@login_required
+def profile(request):
+    """Allow users to view and update their profile and password."""
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        if 'profile_submit' in request.POST:
+            form = ProfileForm(request.POST, request.FILES, instance=request.user, profile_instance=profile_obj)
+            password_form = PasswordChangeForm(request.user)
+            if form.is_valid():
+                user = form.save()
+                # Update UserProfile fields
+                profile_obj.display_name = form.cleaned_data.get('display_name', profile_obj.display_name)
+                profile_obj.phone = form.cleaned_data.get('phone', profile_obj.phone)
+                if 'avatar' in request.FILES:
+                    profile_obj.avatar = request.FILES['avatar']
+                profile_obj.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('profile')
+        elif 'password_submit' in request.POST:
+            form = ProfileForm(instance=request.user, profile_instance=profile_obj)
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Password changed successfully.')
+                return redirect('profile')
+    else:
+        form = ProfileForm(instance=request.user, profile_instance=profile_obj)
+        password_form = PasswordChangeForm(request.user)
+
+    context = {
+        'form': form,
+        'password_form': password_form,
+        'profile': profile_obj,
+    }
+    return render(request, 'detector/profile.html', context)
+
+
+@login_required
+def settings_view(request):
+    """User-specific workflow settings and model preferences."""
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'POST':
+        if 'delete_model' in request.POST:
+            latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+            if latest_session and latest_session.model_path and os.path.exists(latest_session.model_path):
+                try:
+                    os.remove(latest_session.model_path)
+                    latest_session.model_path = ""
+                    latest_session.status = "failed"
+                    latest_session.error_message = "Model deleted by user"
+                    latest_session.save()
+                    messages.success(request, 'Model file deleted successfully.')
+                except Exception as e:
+                    messages.error(request, f'Failed to delete model: {str(e)}')
+            return redirect('settings')
+            
+        form = UserSettingsForm(request.POST, instance=profile_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Settings saved successfully.')
+            return redirect('settings')
+    else:
+        form = UserSettingsForm(instance=profile_obj)
+
+    # Calculate cache size (frames directory)
+    cache_size = 0
+    frames_root = os.path.join(settings.MEDIA_ROOT, 'frames')
+    if os.path.exists(frames_root):
+        for root, dirs, files in os.walk(frames_root):
+            for f in files:
+                cache_size += os.path.getsize(os.path.join(root, f))
+    
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+
+    context = {
+        'form': form,
+        'profile': profile_obj,
+        'model_exists': model_exists,
+        'cache_size': round(cache_size / (1024 * 1024), 1),
+    }
+    return render(request, 'detector/settings.html', context)
+
+
 @require_POST
 @login_required
 def delete_video(request, video_id):
     """Delete an uploaded video."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
     title = video.title
 
     # Delete video file and frames
     if video.video_file and os.path.exists(video.video_path):
         os.remove(video.video_path)
     if os.path.exists(video.frames_dir):
-        import shutil
         shutil.rmtree(video.frames_dir)
 
     video.delete()
@@ -188,7 +290,7 @@ def delete_video(request, video_id):
 @login_required
 def update_label(request, video_id):
     """Update a video's label (real/fake)."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
     new_label = request.POST.get('label', 'unlabeled')
     if new_label in ['real', 'fake', 'unlabeled']:
         video.label = new_label
@@ -200,6 +302,7 @@ def update_label(request, video_id):
 @login_required
 def train_model(request):
     """Model training page and handler."""
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
     if request.method == 'POST':
         form = TrainingConfigForm(request.POST)
         if form.is_valid():
@@ -208,8 +311,8 @@ def train_model(request):
             validation_split = form.cleaned_data['validation_split']
 
             # Check for labeled sample videos
-            real_count = Video.objects.filter(label='real', video_type='sample').count()
-            fake_count = Video.objects.filter(label='fake', video_type='sample').count()
+            real_count = Video.objects.filter(label='real', video_type='sample', user=request.user).count()
+            fake_count = Video.objects.filter(label='fake', video_type='sample', user=request.user).count()
 
             if real_count == 0 or fake_count == 0:
                 messages.error(
@@ -222,14 +325,14 @@ def train_model(request):
 
             # Create training session
             session = TrainingSession.objects.create(
+                user=request.user,
                 epochs=epochs,
                 batch_size=batch_size,
             )
 
             # Run training
             try:
-                from .ml.trainer import train_model as run_training
-                labeled_videos = Video.objects.filter(video_type='sample').exclude(label='unlabeled')
+                labeled_videos = Video.objects.filter(video_type='sample', user=request.user).exclude(label='unlabeled')
 
                 result = run_training(
                     training_session=session,
@@ -252,13 +355,13 @@ def train_model(request):
         form = TrainingConfigForm()
 
     # Get training history
-    sessions = TrainingSession.objects.all()[:10]
-    model_path = str(getattr(settings, 'MODEL_FILE', ''))
-    model_exists = os.path.exists(model_path) if model_path else False
+    sessions = TrainingSession.objects.filter(user=request.user)[:10]
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
 
     # Dataset stats for sample videos
-    real_count = Video.objects.filter(label='real', video_type='sample').count()
-    fake_count = Video.objects.filter(label='fake', video_type='sample').count()
+    real_count = Video.objects.filter(label='real', video_type='sample', user=request.user).count()
+    fake_count = Video.objects.filter(label='fake', video_type='sample', user=request.user).count()
     total_labeled = real_count + fake_count
 
     context = {
@@ -268,6 +371,7 @@ def train_model(request):
         'real_count': real_count,
         'fake_count': fake_count,
         'total_labeled': total_labeled,
+        'profile': profile_obj,
     }
     return render(request, 'detector/train.html', context)
 
@@ -276,14 +380,16 @@ def train_model(request):
 def detect_forgery(request):
     """Video forgery detection page - show only test video if exists."""
     # Get the current test video (last uploaded test video)
-    test_video = Video.objects.filter(video_type='test').order_by('-uploaded_at').first()
+    test_video = Video.objects.filter(video_type='test', user=request.user).order_by('-uploaded_at').first()
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
     
-    model_path = str(getattr(settings, 'MODEL_FILE', ''))
-    model_exists = os.path.exists(model_path) if model_path else False
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
 
     context = {
         'video': test_video,
         'model_exists': model_exists,
+        'profile': profile_obj,
     }
     return render(request, 'detector/detect.html', context)
 
@@ -291,20 +397,26 @@ def detect_forgery(request):
 @login_required
 def run_detection(request, video_id):
     """Run forgery detection on a specific video."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
 
-    model_path = str(getattr(settings, 'MODEL_FILE', ''))
-    if not os.path.exists(model_path):
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    if not latest_session or not latest_session.model_path or not os.path.exists(latest_session.model_path):
         messages.error(request, 'No trained model found. Please train a model first.')
         return redirect('detect_forgery')
+
+    model_path = latest_session.model_path
 
     try:
         video.status = 'processing'
         video.save()
 
         # Run prediction
-        from .ml.predictor import predict_video
-        result = predict_video(video.video_path, model_path)
+        profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+        result = predict_video(
+            video.video_path,
+            model_path,
+            max_frames=profile_obj.preferred_frame_sample_rate * 2 # Analyze more frames if user wants higher sample rate
+        )
 
         # Save results to database
         analysis, created = AnalysisResult.objects.update_or_create(
@@ -322,7 +434,14 @@ def run_detection(request, video_id):
 
         # If fake, detect forgery regions
         if result['verdict'] == 'fake':
-            _process_forgery_regions(analysis, result, video)
+            profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+            _process_forgery_regions(
+                analysis,
+                result,
+                video,
+                threshold=profile_obj.detection_threshold,
+                show_heatmap=profile_obj.show_heatmap,
+            )
 
         video.status = 'analyzed'
         video.save()
@@ -341,10 +460,8 @@ def run_detection(request, video_id):
         return redirect('detect_forgery')
 
 
-def _process_forgery_regions(analysis, prediction_result, video):
+def _process_forgery_regions(analysis, prediction_result, video, threshold=0.4, show_heatmap=False):
     """Process and save forgery region detections for fake videos."""
-    import cv2
-    from .ml.region_detector import detect_forgery_regions, annotate_frame
 
     # Clear existing regions
     analysis.regions.all().delete()
@@ -373,11 +490,11 @@ def _process_forgery_regions(analysis, prediction_result, video):
                 frame = frames[local_idx]
 
                 # Detect regions
-                regions = detect_forgery_regions(frame, threshold=0.3)
+                regions = detect_forgery_regions(frame, threshold=threshold)
 
                 if regions:
                     # Annotate frame
-                    annotated = annotate_frame(frame, regions)
+                    annotated = annotate_frame(frame, regions, show_heatmap=show_heatmap)
 
                     # Save frames to disk
                     orig_filename = f"orig_{video.id}_{frame_idx}.jpg"
@@ -414,7 +531,7 @@ def _process_forgery_regions(analysis, prediction_result, video):
 @login_required
 def view_results(request, video_id):
     """Display detection results for a video."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
     analysis = get_object_or_404(AnalysisResult, video=video)
     regions = analysis.regions.all()
 
@@ -457,7 +574,7 @@ def view_results(request, video_id):
 @login_required
 def all_results(request):
     """List all analysis results from test videos."""
-    results = AnalysisResult.objects.filter(video__video_type='test').select_related('video').all()
+    results = AnalysisResult.objects.filter(video__video_type='test', video__user=request.user).select_related('video').all()
     context = {
         'results': results,
     }
@@ -480,6 +597,7 @@ def ajax_upload_video(request):
         video_type = 'sample'
     
     video = Video.objects.create(
+        user=request.user,
         title=title,
         video_file=video_file,
         label=label,
@@ -488,9 +606,6 @@ def ajax_upload_video(request):
     )
     
     try:
-        from .ml.frame_extractor import extract_frames
-        import cv2
-        
         # Determine specific folder based on label to make it clear
         label_dir = video.label if video.label != 'unlabeled' else 'training'
         output_dir = os.path.join(settings.MEDIA_ROOT, 'frames', label_dir, str(video.id))
@@ -517,7 +632,6 @@ def ajax_upload_video(request):
     frame_urls = []
     if os.path.exists(output_dir):
         # Explicit numeric sort to ensure 1, 2, ... 10 order
-        import re
         files = os.listdir(output_dir)
         # Filter only jpg files and sort by number found in filename
         files = [f for f in files if f.endswith('.jpg')]
@@ -548,27 +662,28 @@ def ajax_upload_video(request):
 @require_POST
 def ajax_train_model(request):
     """Trigger model training asynchronously."""
-    real_count = Video.objects.filter(label='real', video_type='sample').count()
-    fake_count = Video.objects.filter(label='fake', video_type='sample').count()
+    real_count = Video.objects.filter(label='real', video_type='sample', user=request.user).count()
+    fake_count = Video.objects.filter(label='fake', video_type='sample', user=request.user).count()
     
     if real_count == 0 or fake_count == 0:
         return JsonResponse({'status': 'error', 'message': 'Need at least 1 real AND 1 fake labeled video.'}, status=400)
         
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
     session = TrainingSession.objects.create(
-        epochs=1,  # Short epochs for demonstration purposes
+        user=request.user,
+        epochs=1,
         batch_size=2,
     )
     
     try:
-        from .ml.trainer import train_model as run_training
-        labeled_videos = Video.objects.filter(video_type='sample').exclude(label='unlabeled')
+        labeled_videos = Video.objects.filter(video_type='sample', user=request.user).exclude(label='unlabeled')
         
         result = run_training(
             training_session=session,
             videos_queryset=labeled_videos,
             epochs=1,
             batch_size=2,
-            validation_split=0.2,
+            validation_split=profile_obj.preferred_validation_split,
         )
         return JsonResponse({'status': 'success', 'message': 'Model is trained!', 'accuracy': result.get('final_accuracy', 0)})
     except Exception as e:
@@ -584,6 +699,7 @@ def ajax_test_video(request):
         return JsonResponse({'status': 'error', 'message': 'No video file provided.'}, status=400)
         
     video = Video.objects.create(
+        user=request.user,
         title=request.POST.get('title', 'Test Video'),
         video_file=video_file,
         label='unlabeled',
@@ -591,16 +707,22 @@ def ajax_test_video(request):
         file_size_mb=video_file.size / (1024 * 1024)
     )
     
-    model_path = str(getattr(settings, 'MODEL_FILE', ''))
-    if not os.path.exists(model_path):
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    if not latest_session or not latest_session.model_path or not os.path.exists(latest_session.model_path):
         return JsonResponse({'status': 'error', 'message': 'No trained model found.'}, status=400)
+    
+    model_path = latest_session.model_path
         
     try:
         video.status = 'processing'
         video.save()
         
-        from .ml.predictor import predict_video
-        result = predict_video(video.video_path, model_path)
+        profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+        result = predict_video(
+            video.video_path,
+            model_path,
+            max_frames=profile_obj.preferred_frame_sample_rate * 2
+        )
         
         analysis, _ = AnalysisResult.objects.update_or_create(
             video=video,
@@ -617,7 +739,14 @@ def ajax_test_video(request):
         
         annotated_frame_url = None
         if result['verdict'] == 'fake':
-            _process_forgery_regions(analysis, result, video)
+            profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
+            _process_forgery_regions(
+                analysis,
+                result,
+                video,
+                threshold=profile_obj.detection_threshold,
+                show_heatmap=profile_obj.show_heatmap,
+            )
             # Fetch the first region saved
             first_region = analysis.regions.first()
             if first_region and first_region.annotated_frame:
@@ -643,7 +772,7 @@ def ajax_test_video(request):
 @require_POST
 def ajax_delete_video(request, video_id):
     """Asynchronously delete an uploaded video."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
     
     # Delete video file and frames
     if video.video_file and os.path.exists(video.video_path):
@@ -660,7 +789,7 @@ def ajax_delete_video(request, video_id):
 @require_POST
 def ajax_update_label(request, video_id):
     """Asynchronously update a video's label."""
-    video = get_object_or_404(Video, id=video_id)
+    video = get_object_or_404(Video, id=video_id, user=request.user)
     new_label = request.POST.get('label', 'unlabeled')
     if new_label in ['real', 'fake', 'unlabeled']:
         video.label = new_label

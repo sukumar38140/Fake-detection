@@ -73,17 +73,6 @@
                 Quick Actions
             </h2>
             <div class="actions-grid">
-                <a href="{% url 'upload_video' %}" class="action-btn" id="action-upload">
-                    <div class="action-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                    </div>
-                    <span class="action-label">Upload Video</span>
-                    <span class="action-desc">Add videos</span>
-                </a>
                 <a href="{% url 'train_model' %}" class="action-btn" id="action-train">
                     <div class="action-icon purple">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -106,6 +95,17 @@
                     </div>
                     <span class="action-label">Detect Forgery</span>
                     <span class="action-desc">Check videos</span>
+                </a>
+                <a href="{% url 'upload_video' %}" class="action-btn" id="action-upload">
+                    <div class="action-icon blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="action-label">Upload Video</span>
+                    <span class="action-desc">Add videos</span>
                 </a>
                 <a href="{% url 'all_results' %}" class="action-btn" id="action-results">
                     <div class="action-icon orange">
@@ -180,28 +180,28 @@
                 <p style="color: #666; font-size: 14px; margin-top: 5px;">{{ current_test_video.file_size_mb|floatformat:1 }} MB • {{ current_test_video.duration_seconds|floatformat:1 }}s • {{ current_test_video.frame_count }} frames</p>
             </div>
             {% if current_result %}
-            <div class="test-video-result" style="margin-top: 15px; padding: 15px; background: {% if current_result.verdict == 'fake' %}#ffe5e5{% else %}#e5f5ed{% endif %}; border-radius: 8px;">
+            <div class="test-video-result" style="margin-top: 15px; padding: 15px; background: {% if current_result.verdict == 'fake' %}var(--color-danger-bg){% else %}var(--color-success-bg){% endif %}; border: 1px solid var(--color-border); border-radius: 8px;">
                 {% if current_result.verdict == 'fake' and current_result.regions.first %}
                 <div style="margin-bottom: 15px; text-align: center;">
-                    <img src="{{ current_result.regions.first.annotated_frame.url }}" alt="Fake Detection Screenshot" style="max-width:100%; border-radius: 8px; border: 2px solid #e53e3e;" />
+                    <img src="{{ current_result.regions.first.annotated_frame.url }}" alt="Fake Detection Screenshot" style="max-width:100%; border-radius: 8px; border: 2px solid var(--color-danger);" />
                 </div>
                 {% endif %}
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <div style="font-size: 16px; font-weight: 600; color: {% if current_result.verdict == 'fake' %}#dc3545{% else %}#28a745{% endif %};">
+                        <div style="font-size: 16px; font-weight: 600; color: {% if current_result.verdict == 'fake' %}var(--color-danger){% else %}var(--color-success){% endif %};">
                             Video is detected as {{ current_result.verdict|upper }}
                         </div>
-                        <p style="color: #666; font-size: 13px; margin-top: 5px;">(Confidence: {{ current_result.confidence|pct|floatformat:1 }}%)</p>
+                        <p style="color: var(--color-text-secondary); font-size: 13px; margin-top: 5px;">(Confidence: {{ current_result.confidence|pct|floatformat:1 }}%)</p>
                     </div>
                     <div style="text-align: right;">
-                        <p style="color: #666; font-size: 12px;">{{ current_result.fake_frame_count }} / {{ current_result.total_frames_analyzed }} frames suspicious</p>
+                        <p style="color: var(--color-text-tertiary); font-size: 12px;">{{ current_result.fake_frame_count }} / {{ current_result.total_frames_analyzed }} frames suspicious</p>
                     </div>
                 </div>
                 <a href="{% url 'view_results' current_test_video.id %}" class="btn btn-primary btn-sm" style="margin-top: 12px;">View Detailed Report</a>
             </div>
             {% else %}
-            <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
-                <p style="color: #666; margin-bottom: 10px;">No analysis results yet</p>
+            <div style="margin-top: 15px; padding: 15px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 8px; text-align: center;">
+                <p style="color: var(--color-text-secondary); margin-bottom: 10px;">No analysis results yet</p>
                 <a href="{% url 'detect_forgery' %}" class="btn btn-primary btn-sm">Run Analysis</a>
             </div>
             {% endif %}

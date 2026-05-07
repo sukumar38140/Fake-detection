@@ -1,133 +1,266 @@
 {% extends "detector/base.html" %}
 
-{% block title %}Register{% endblock %}
+{% block title %}Create Account | DeepFake Forensic{% endblock %}
 
 {% block extra_css %}
 <style>
-    .auth-container {
+    .auth-page {
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: calc(100vh - 150px);
+        min-height: calc(100vh - 100px);
+        padding: var(--space-xl);
+        background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent),
+                    radial-gradient(circle at bottom left, rgba(168, 85, 247, 0.05), transparent);
     }
+
     .auth-card {
         width: 100%;
-        max-width: 420px;
-        background: var(--color-bg-card);
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius);
-        padding: var(--space-3xl) var(--space-2xl);
-        box-shadow: var(--shadow-lg);
+        max-width: 500px;
+        background: rgba(17, 24, 39, 0.7);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        padding: var(--space-2xl);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
+
+    @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.98) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
     .auth-header {
         text-align: center;
-        margin-bottom: var(--space-2xl);
+        margin-bottom: var(--space-xl);
     }
-    .auth-logo {
-        display: flex;
+
+    .auth-brand {
+        display: inline-flex;
+        align-items: center;
         justify-content: center;
-        margin-bottom: var(--space-base);
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-purple));
+        border-radius: 16px;
+        margin-bottom: var(--space-lg);
+        box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
     }
+
+    .auth-brand svg {
+        width: 32px;
+        height: 32px;
+        color: white;
+    }
+
     .auth-title {
         font-size: var(--font-size-xl);
-        font-weight: 700;
-        color: var(--color-text-primary);
+        font-weight: 800;
+        letter-spacing: -0.02em;
         margin-bottom: var(--space-xs);
     }
+
     .auth-subtitle {
         color: var(--color-text-tertiary);
         font-size: var(--font-size-sm);
     }
-    .auth-form {
+
+    .premium-form {
         display: flex;
         flex-direction: column;
-        gap: var(--space-base);
+        gap: var(--space-lg);
     }
-    /* Style django forms which usually don't have classes */
-    .auth-form input {
-        width: 100%;
-        padding: 10px 12px;
-        background: var(--color-bg-input);
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius-sm);
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-md);
+    }
+
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .input-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--color-text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-left: 4px;
+    }
+
+    .premium-input {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 12px 16px;
         color: var(--color-text-primary);
         font-size: var(--font-size-sm);
-        transition: all var(--transition-fast);
+        transition: all 0.2s ease;
     }
-    .auth-form input:focus {
+
+    .premium-input:focus {
+        background: rgba(15, 23, 42, 0.9);
         border-color: var(--color-primary);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
         outline: none;
-        box-shadow: 0 0 0 3px var(--color-primary-glow);
     }
+
+    .field-help {
+        font-size: 10px;
+        color: var(--color-text-muted);
+        line-height: 1.4;
+        margin-top: 4px;
+        padding: 0 4px;
+    }
+
+    .field-errors {
+        list-style: none;
+        padding: 0;
+        margin-top: 4px;
+    }
+
+    .field-errors li {
+        font-size: 11px;
+        color: var(--color-danger);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .field-errors li::before {
+        content: '•';
+    }
+
+    .submit-btn {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-purple));
+        border: none;
+        border-radius: 12px;
+        padding: 14px;
+        color: white;
+        font-weight: 700;
+        font-size: var(--font-size-base);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: var(--space-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-sm);
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        filter: brightness(1.1);
+    }
+
     .auth-footer {
-        margin-top: var(--space-2xl);
+        margin-top: var(--space-xl);
         text-align: center;
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
+        padding-top: var(--space-lg);
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
     }
+
     .auth-footer a {
-        font-weight: 600;
         color: var(--color-primary);
+        font-weight: 700;
+        transition: all 0.2s ease;
     }
-    .helptext {
-        display: block;
-        font-size: 11px;
-        color: var(--color-text-tertiary);
-        margin-top: 4px;
-        line-height: 1.3;
+
+    .auth-footer a:hover {
+        color: var(--color-primary-hover);
+        text-decoration: underline;
     }
-    ul.errorlist {
-        list-style: none;
-        padding: 0;
-        margin: 5px 0 0 0;
-        color: var(--color-danger);
-        font-size: 11px;
+
+    /* Override Django default classes if any */
+    .form-input {
+        composes: premium-input;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="auth-container">
+<div class="auth-page">
     <div class="auth-card">
         <div class="auth-header">
-            <div class="auth-logo">
-                <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
-                    <rect width="28" height="28" rx="8" fill="url(#logoGradAuth)"/>
-                    <path d="M8 14L12 18L20 10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    <defs>
-                        <linearGradient id="logoGradAuth" x1="0" y1="0" x2="28" y2="28">
-                            <stop stop-color="#6366f1"/>
-                            <stop offset="1" stop-color="#a855f7"/>
-                        </linearGradient>
-                    </defs>
+            <div class="auth-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 8v4"/>
+                    <path d="M12 16h.01"/>
                 </svg>
             </div>
-            <h2 class="auth-title">User Registration</h2>
+            <h1 style="font-size: var(--font-size-sm); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 8px;">ForgeGuard AI</h1>
+            <h2 class="auth-title">Get Started</h2>
             <p class="auth-subtitle">DeepFake Detection Forensic Tool</p>
         </div>
 
-        <form method="POST" class="auth-form">
+        <form method="POST" class="premium-form">
             {% csrf_token %}
-            {% for field in form %}
-            <div class="form-group" style="margin-bottom: var(--space-md);">
-                <label for="{{ field.id_for_label }}" class="form-label" style="display:block; margin-bottom: 6px; font-weight:500;">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                <span class="helptext">{{ field.help_text|safe }}</span>
-                {% endif %}
-                {% if field.errors %}
-                {{ field.errors }}
-                {% endif %}
-            </div>
-            {% endfor %}
             
-            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-md);">
-                Create Account
+            <div class="form-row">
+                <div class="input-group">
+                    <label class="input-label">First Name</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<ul class="field-errors">{% for error in form.first_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Last Name</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<ul class="field-errors">{% for error in form.last_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Username</label>
+                {{ form.username }}
+                {% if form.username.help_text %}<div class="field-help">{{ form.username.help_text|safe }}</div>{% endif %}
+                {% if form.username.errors %}<ul class="field-errors">{% for error in form.username.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Email Address</label>
+                {{ form.email }}
+                {% if form.email.errors %}<ul class="field-errors">{% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label class="input-label">Password</label>
+                    {{ form.password1 }}
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Confirm</label>
+                    {{ form.password2 }}
+                </div>
+            </div>
+
+            {% if form.password1.errors or form.password2.errors %}
+            <ul class="field-errors">
+                {% for error in form.password1.errors %}<li>{{ error }}</li>{% endfor %}
+                {% for error in form.password2.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+
+            <button type="submit" class="submit-btn">
+                Create Secure Account
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
             </button>
         </form>
 
         <div class="auth-footer">
-            Already have an account? <a href="{% url 'login' %}">Sign in</a>
+            Already have an account? <a href="{% url 'login' %}">Sign in here</a>
         </div>
     </div>
 </div>

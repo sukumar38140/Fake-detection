@@ -17,7 +17,7 @@ from .frame_extractor import extract_frames
 
 
 def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
-                validation_split=0.2):
+                validation_split=0.2, max_frames=10):
     """
     Train a lightweight RandomForest model on labeled videos using scikit-learn.
 
@@ -57,7 +57,7 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
             video_path = video.video_path
             if os.path.exists(video_path):
                 try:
-                    result = extract_frames(video_path, max_frames=10)
+                    result = extract_frames(video_path, max_frames=max_frames)
                     frames = result['frames']
                     
                     for frame in frames:
@@ -74,7 +74,7 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
             video_path = video.video_path
             if os.path.exists(video_path):
                 try:
-                    result = extract_frames(video_path, max_frames=10)
+                    result = extract_frames(video_path, max_frames=max_frames)
                     frames = result['frames']
                     
                     for frame in frames:
@@ -118,9 +118,11 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
 
         # Ensure model directory exists
         model_dir = getattr(settings, 'ML_MODELS_DIR', os.path.join(settings.BASE_DIR, 'ml_models'))
-        os.makedirs(str(model_dir), exist_ok=True)
-        model_path = str(getattr(settings, 'MODEL_FILE',
-                                 os.path.join(str(model_dir), 'forgeryDetect_model.pkl')))
+        user_model_dir = os.path.join(str(model_dir), f'user_{training_session.user.id}')
+        os.makedirs(user_model_dir, exist_ok=True)
+        
+        model_filename = f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+        model_path = os.path.join(user_model_dir, model_filename)
 
         # Save model
         with open(model_path, 'wb') as f:
@@ -155,21 +157,42 @@ def train_model(training_session, videos_queryset, epochs=50, batch_size=16,
 
 
 def compute_single_frame_features(frame):
-    """Compute statistical features from a single frame."""
-    # Mean color values
-    mean_r = np.mean(frame[:, :, 0])
-    mean_g = np.mean(frame[:, :, 1])
-    mean_b = np.mean(frame[:, :, 2])
+    """
+    Compute statistical and forensic features from a single frame.
     
-    # Standard deviation of color values
-    std_r = np.std(frame[:, :, 0])
-    std_g = np.std(frame[:, :, 1])
-    std_b = np.std(frame[:, :, 2])
+    Features:
+    - RGB Statistics (Mean, Std)
+    - Brightness & Contrast
+    - Laplacian Variance (Focus/Blur measure)
+    - Basic color histogram (3 bins per channel)
+    """
+    import cv2
     
-    # Brightness (average intensity)
-    brightness = np.mean(frame)
+    # 1. Basic Statistical Features
+    mean_vals = np.mean(frame, axis=(0, 1)) # [R, G, B]
+    std_vals = np.std(frame, axis=(0, 1))   # [R, G, B]
+    brightness = np.mean(mean_vals)
+    contrast = np.mean(std_vals)
     
-    # Contrast (standard deviation of all pixels)
-    contrast = np.std(frame)
+    # 2. Forensic Features
+    # Laplacian Variance: Deepfakes often have inconsistent blur/sharpness
+    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
     
-    return np.array([mean_r, mean_g, mean_b, std_r, std_g, std_b, brightness, contrast])
+    # 3. Simple Color Histogram (3 bins per channel)
+    hist_features = []
+    for i in range(3):
+        hist = cv2.calcHist([frame], [i], None, [3], [0, 256])
+        hist = cv2.normalize(hist, hist).flatten()
+        hist_features.extend(hist)
+        
+    features = [
+        *mean_vals,
+        *std_vals,
+        brightness,
+        contrast,
+        laplacian_var,
+        *hist_features
+    ]
+    
+    return np.array(features)

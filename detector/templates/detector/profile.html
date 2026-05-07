@@ -1,0 +1,198 @@
+{% extends "detector/base.html" %}
+{% load static %}
+
+{% block title %}User Profile{% endblock %}
+{% block page_title %}User Profile{% endblock %}
+{% block page_subtitle %}Manage your account details and security{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="dashboard-columns">
+        <!-- Profile Details -->
+        <div class="card">
+            <h2 class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Account Information
+            </h2>
+            <form method="post" class="profile-form" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="avatar-upload-section">
+                    <div class="current-avatar">
+                        <img src="{{ profile.avatar_url }}" alt="Avatar" id="avatar-preview">
+                    </div>
+                    <div class="avatar-controls">
+                        <label for="profile-avatar" class="btn btn-outline btn-sm">
+                            Change Photo
+                        </label>
+                        {{ form.avatar }}
+                        <p class="form-help">JPG, PNG or GIF. Max 5MB.</p>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="display_name" class="form-label">Display Name</label>
+                        <input type="text" name="display_name" id="display_name" class="form-input" value="{{ form.display_name.value|default:'' }}" placeholder="Your public name">
+                    </div>
+                    <div class="form-group">
+                        <label for="id_phone" class="form-label">Phone Number</label>
+                        <input type="text" name="phone" id="id_phone" class="form-input" value="{{ form.phone.value|default:'' }}" placeholder="+1 (555) 000-0000">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="id_first_name" class="form-label">First Name</label>
+                        {{ form.first_name }}
+                    </div>
+                    <div class="form-group">
+                        <label for="id_last_name" class="form-label">Last Name</label>
+                        {{ form.last_name }}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_email" class="form-label">Email Address</label>
+                    {{ form.email }}
+                </div>
+
+                <div class="form-actions" style="margin-top: var(--space-xl);">
+                    <button type="submit" name="profile_submit" class="btn btn-primary">
+                        Update Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Security / Password -->
+        <div class="card">
+            <h2 class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-title-icon">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Security Settings
+            </h2>
+            <p class="card-desc">Change your password to keep your account secure.</p>
+            
+            <form method="post" class="password-form">
+                {% csrf_token %}
+                {% for field in password_form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    <input type="{{ field.field.widget.input_type }}" name="{{ field.html_name }}" id="{{ field.id_for_label }}" class="form-input" placeholder="{{ field.label }}">
+                    {% if field.errors %}
+                    <div class="form-error">{{ field.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                <div class="form-actions" style="margin-top: var(--space-xl);">
+                    <button type="submit" name="password_submit" class="btn btn-outline">
+                        Change Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-form, .password-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-lg);
+    }
+    .avatar-upload-section {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xl);
+        margin-bottom: var(--space-lg);
+        padding: var(--space-md);
+        background: var(--color-bg-elevated);
+        border-radius: var(--border-radius-md);
+    }
+    .current-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid var(--color-primary);
+        flex-shrink: 0;
+    }
+    .current-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .avatar-controls {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+    .avatar-controls input[type="file"] {
+        display: none;
+    }
+    .form-help {
+        font-size: 0.75rem;
+        color: var(--color-text-tertiary);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-base);
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+    .form-label {
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        color: var(--color-text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .form-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        margin-top: 4px;
+    }
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--color-border);
+        color: var(--color-text-primary);
+        padding: var(--space-md) var(--space-xl);
+        border-radius: var(--border-radius-sm);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-base);
+    }
+    .btn-outline:hover {
+        background: var(--color-bg-elevated);
+        border-color: var(--color-text-secondary);
+    }
+    .btn-sm {
+        padding: var(--space-xs) var(--space-md);
+        font-size: 0.8rem;
+    }
+</style>
+
+<script>
+    // Avatar preview
+    document.getElementById('profile-avatar').addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('avatar-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+</script>
+{% endblock %}

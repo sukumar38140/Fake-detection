@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'detector.middleware.SecureSessionMiddleware',
 ]
 
 ROOT_URLCONF = 'forgery_project.urls'
@@ -121,7 +122,6 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 
 # ML Model settings
 ML_MODELS_DIR = BASE_DIR / 'ml_models'
-MODEL_FILE = ML_MODELS_DIR / 'forgeryDetect_model.pkl'
 
 # Authentication Settings
 LOGIN_URL = 'login'
