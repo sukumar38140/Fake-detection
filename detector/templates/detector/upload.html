@@ -229,7 +229,7 @@
 
     if (dropZone && fileInput) {
         dropZone.addEventListener('click', function(e) {
-            if (e.target === dropZone || dropZone.contains(e.target)) {
+            if (e.target !== fileInput) {
                 fileInput.click();
             }
         });
@@ -263,6 +263,13 @@
             fileSize.textContent = formatFileSize(file.size);
             fileInfo.style.display = 'flex';
             dropZone.classList.add('has-file');
+            
+            // Auto-fill title from filename if empty
+            const titleInput = document.getElementById('video-title') || document.getElementById('id_title');
+            if (titleInput && (!titleInput.value || titleInput.value.trim() === '')) {
+                const name = file.name.split('.').slice(0, -1).join('.');
+                titleInput.value = name;
+            }
         }
 
         function formatFileSize(bytes) {
@@ -465,7 +472,7 @@
         
         // Auto-fill title from filename if empty
         fileInput.addEventListener('change', function() {
-            const titleInput = document.getElementById('video-title');
+            const titleInput = document.getElementById('video-title') || document.getElementById('id_title');
             if (titleInput && !titleInput.value && this.files.length > 0) {
                 const name = this.files[0].name.split('.').slice(0, -1).join('.');
                 titleInput.value = name;

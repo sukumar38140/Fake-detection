@@ -82,6 +82,25 @@ def logout_user(request):
     return redirect('login')
 
 
+def _get_model_path_for_user(user):
+    """Retrieve the path to the user's trained model, falling back to the default demo model."""
+    latest_session = TrainingSession.objects.filter(user=user, status='completed').first()
+    if latest_session and latest_session.model_path and os.path.exists(latest_session.model_path):
+        return latest_session.model_path
+        
+    # Check for default demo model fallback
+    default_model = os.path.join(settings.BASE_DIR, 'ml_models', 'default_model.pkl')
+    if os.path.exists(default_model):
+        return default_model
+        
+    return None
+
+
+def _check_model_exists(user):
+    """Check if either a user-trained model or default demo model exists."""
+    return _get_model_path_for_user(user) is not None
+
+
 @login_required
 def dashboard(request):
     """Main dashboard with system overview and statistics."""
@@ -104,7 +123,7 @@ def dashboard(request):
     latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
 
     # Check if user has a trained model
-    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+    model_exists = _check_model_exists(request.user)
 
     # Get current test video (last uploaded)
     current_test_video = test_videos.order_by('-uploaded_at').first()
@@ -300,7 +319,7 @@ def settings_view(request):
                 cache_size += os.path.getsize(os.path.join(root, f))
     
     latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+    model_exists = _check_model_exists(request.user)
 
     context = {
         'form': form,
@@ -311,6 +330,62 @@ def settings_view(request):
     return render(request, 'detector/settings.html', context)
 
 
+def _delete_video_files(video):
+    """Clean up all files associated with a video from disk."""
+    # Delete original video file
+    try:
+        if video.video_file and os.path.exists(video.video_path):
+            os.remove(video.video_path)
+    except Exception:
+        pass
+            
+    # Delete extracted frames directory
+    try:
+        if os.path.exists(video.frames_dir):
+            shutil.rmtree(video.frames_dir)
+    except Exception:
+        pass
+            
+    # Delete thumbnail
+    try:
+        if video.thumbnail and hasattr(video.thumbnail, 'path') and os.path.exists(video.thumbnail.path):
+            os.remove(video.thumbnail.path)
+    except Exception:
+        pass
+            
+    # Delete analysis result files (screenshot, forgery regions)
+    try:
+        if hasattr(video, 'result'):
+            result = video.result
+            if result.screenshot and hasattr(result.screenshot, 'path') and os.path.exists(result.screenshot.path):
+                try:
+                    os.remove(result.screenshot.path)
+                except Exception:
+                    pass
+            
+            # Delete ForgeryRegion frames
+            for region in result.regions.all():
+                if region.original_frame and hasattr(region.original_frame, 'path') and os.path.exists(region.original_frame.path):
+                    try:
+                        os.remove(region.original_frame.path)
+                    except Exception:
+                        pass
+                if region.annotated_frame and hasattr(region.annotated_frame, 'path') and os.path.exists(region.annotated_frame.path):
+                    try:
+                        os.remove(region.annotated_frame.path)
+                    except Exception:
+                        pass
+            
+            # Also clean up result directory
+            if os.path.exists(result.results_dir):
+                try:
+                    shutil.rmtree(result.results_dir)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 @require_POST
 @login_required
 def delete_video(request, video_id):
@@ -318,14 +393,20 @@ def delete_video(request, video_id):
     video = get_object_or_404(Video, id=video_id, user=request.user)
     title = video.title
 
-    # Delete video file and frames
-    if video.video_file and os.path.exists(video.video_path):
-        os.remove(video.video_path)
-    if os.path.exists(video.frames_dir):
-        shutil.rmtree(video.frames_dir)
-
+    _delete_video_files(video)
     video.delete()
     messages.success(request, f'Video "{title}" deleted.')
+    
+    # Redirect intelligently based on where we came from
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        if 'results' in referer:
+            return redirect('all_results')
+        elif 'detect' in referer:
+            return redirect('detect_forgery')
+        elif 'dashboard' in referer:
+            return redirect('dashboard')
+            
     return redirect('upload_video')
 
 
@@ -400,7 +481,7 @@ def train_model(request):
     # Get training history
     sessions = TrainingSession.objects.filter(user=request.user)[:10]
     latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+    model_exists = _check_model_exists(request.user)
 
     # Dataset stats for sample videos
     real_count = Video.objects.filter(label='real', video_type='sample', user=request.user).count()
@@ -424,7 +505,7 @@ def detect_forgery(request):
     """Video forgery detection page - show only test video if exists."""
     # Check if user has a trained model
     latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+    model_exists = _check_model_exists(request.user)
     
     # Redirect to training if no model exists
     if not model_exists:
@@ -448,12 +529,10 @@ def run_detection(request, video_id):
     """Run forgery detection on a specific video."""
     video = get_object_or_404(Video, id=video_id, user=request.user)
 
-    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    if not latest_session or not latest_session.model_path or not os.path.exists(latest_session.model_path):
+    model_path = _get_model_path_for_user(request.user)
+    if not model_path:
         messages.error(request, 'No trained model found. Please train a model first.')
         return redirect('detect_forgery')
-
-    model_path = latest_session.model_path
 
     try:
         video.status = 'processing'
@@ -633,11 +712,13 @@ def all_results(request):
 @login_required
 @require_POST
 def ajax_upload_video(request):
-    """Handle asynchronous video uploads from the train page."""
     video_file = request.FILES.get('video_file')
     title = request.POST.get('title')
     label = request.POST.get('label', 'unlabeled')
     video_type = request.POST.get('video_type', 'sample')
+    
+    if video_file and not title:
+        title = os.path.splitext(video_file.name)[0]
     
     if not video_file or not title or label not in ['real', 'fake', 'unlabeled']:
         return JsonResponse({'status': 'error', 'message': 'Invalid data provided.'}, status=400)
@@ -747,6 +828,10 @@ def ajax_test_video(request):
     if not video_file:
         return JsonResponse({'status': 'error', 'message': 'No video file provided.'}, status=400)
         
+    model_path = _get_model_path_for_user(request.user)
+    if not model_path:
+        return JsonResponse({'status': 'error', 'message': 'No trained model found.'}, status=400)
+        
     video = Video.objects.create(
         user=request.user,
         title=request.POST.get('title', 'Test Video'),
@@ -755,12 +840,6 @@ def ajax_test_video(request):
         video_type='test',
         file_size_mb=video_file.size / (1024 * 1024)
     )
-    
-    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    if not latest_session or not latest_session.model_path or not os.path.exists(latest_session.model_path):
-        return JsonResponse({'status': 'error', 'message': 'No trained model found.'}, status=400)
-    
-    model_path = latest_session.model_path
         
     try:
         video.status = 'processing'
@@ -823,13 +902,7 @@ def ajax_delete_video(request, video_id):
     """Asynchronously delete an uploaded video."""
     video = get_object_or_404(Video, id=video_id, user=request.user)
     
-    # Delete video file and frames
-    if video.video_file and os.path.exists(video.video_path):
-        os.remove(video.video_path)
-    if os.path.exists(video.frames_dir):
-        import shutil
-        shutil.rmtree(video.frames_dir)
-        
+    _delete_video_files(video)
     video.delete()
     return JsonResponse({'status': 'success', 'message': 'Video deleted.'})
 
