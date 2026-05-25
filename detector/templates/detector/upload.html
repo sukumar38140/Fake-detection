@@ -322,6 +322,8 @@
                     fileInfo.style.display = 'none';
                     dropZone.classList.remove('has-file');
                     
+                    const statusDisplay = data.video.status === 'uploaded' ? 'Uploaded' : data.video.status.charAt(0).toUpperCase() + data.video.status.slice(1);
+                    
                     const rowHtml = `
                         <tr id="video-row-${data.video_id}">
                             <td class="video-name">${data.video.title}</td>
@@ -336,7 +338,7 @@
                                 </select>
                             </td>
                             <td>
-                                <span class="status-badge ${data.video.status}">${data.video.status_display}</span>
+                                <span class="status-badge ${data.video.status}">${statusDisplay}</span>
                             </td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="${data.video_id}">
@@ -346,17 +348,19 @@
                         </tr>
                     `;
                     
+                    const videoType = data.video.video_type === 'sample' ? 'sample' : 'test';
+                    const tableBody = document.querySelector(`#${videoType}-videos-section .results-table tbody`);
+                    const emptyState = document.querySelector(`#${videoType}-videos-section .empty-state`);
+                    const tableWrapper = document.querySelector(`#${videoType}-videos-section .results-table-wrapper`);
+                    
                     if (emptyState) {
                         emptyState.style.display = 'none';
-                        if (!videosTableBody) {
-                            // If table didn't exist
-                            window.location.reload(); 
-                        } else {
-                            videosTableBody.insertAdjacentHTML('afterbegin', rowHtml);
-                            if (tableWrapper) tableWrapper.style.display = 'block';
-                        }
-                    } else if (videosTableBody) {
-                        videosTableBody.insertAdjacentHTML('afterbegin', rowHtml);
+                    }
+                    if (tableBody) {
+                        tableBody.insertAdjacentHTML('afterbegin', rowHtml);
+                    }
+                    if (tableWrapper) {
+                        tableWrapper.style.display = 'block';
                     }
                     
                 } else {

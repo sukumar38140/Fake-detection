@@ -811,8 +811,8 @@ def ajax_test_video(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-@login_required
 @require_POST
+@login_required
 def ajax_delete_video(request, video_id):
     """Asynchronously delete an uploaded video."""
     video = get_object_or_404(Video, id=video_id, user=request.user)
