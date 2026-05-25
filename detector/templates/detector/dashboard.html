@@ -84,6 +84,7 @@
                     <span class="action-label">Train Model</span>
                     <span class="action-desc">Teach the AI</span>
                 </a>
+                {% if model_exists %}
                 <a href="{% url 'detect_forgery' %}" class="action-btn" id="action-detect">
                     <div class="action-icon green">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -96,6 +97,20 @@
                     <span class="action-label">Detect Forgery</span>
                     <span class="action-desc">Check videos</span>
                 </a>
+                {% else %}
+                <div class="action-btn action-btn-disabled" id="action-detect" title="Train a model first to detect forgery" style="opacity: 0.5; cursor: not-allowed; pointer-events: none;">
+                    <div class="action-icon green" style="opacity: 0.5;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                            <path d="M11 8v6"/>
+                            <path d="M8 11h6"/>
+                        </svg>
+                    </div>
+                    <span class="action-label">Detect Forgery</span>
+                    <span class="action-desc" style="color: var(--color-danger); font-size: 12px;">Train model first</span>
+                </div>
+                {% endif %}
                 <a href="{% url 'upload_video' %}" class="action-btn" id="action-upload">
                     <div class="action-icon blue">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -201,8 +216,18 @@
             </div>
             {% else %}
             <div style="margin-top: 15px; padding: 15px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 8px; text-align: center;">
-                <p style="color: var(--color-text-secondary); margin-bottom: 10px;">No analysis results yet</p>
+                <p style="color: var(--color-text-secondary); margin-bottom: 10px;">
+                    {% if model_exists %}
+                    No analysis results yet
+                    {% else %}
+                    <span style="color: var(--color-danger); font-weight: 600;">⚠️ Train a model first</span>
+                    {% endif %}
+                </p>
+                {% if model_exists %}
                 <a href="{% url 'detect_forgery' %}" class="btn btn-primary btn-sm">Run Analysis</a>
+                {% else %}
+                <a href="{% url 'train_model' %}" class="btn btn-primary btn-sm">Train Model Now</a>
+                {% endif %}
             </div>
             {% endif %}
         </div>

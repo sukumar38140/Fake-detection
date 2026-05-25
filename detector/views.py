@@ -422,12 +422,18 @@ def train_model(request):
 @login_required
 def detect_forgery(request):
     """Video forgery detection page - show only test video if exists."""
+    # Check if user has a trained model
+    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
+    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
+    
+    # Redirect to training if no model exists
+    if not model_exists:
+        messages.warning(request, 'You need to train a model first. Please upload and label sample videos, then train the model.')
+        return redirect('train_model')
+    
     # Get the current test video (last uploaded test video)
     test_video = Video.objects.filter(video_type='test', user=request.user).order_by('-uploaded_at').first()
     profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
-    
-    latest_session = TrainingSession.objects.filter(user=request.user, status='completed').first()
-    model_exists = latest_session is not None and os.path.exists(latest_session.model_path) if latest_session else False
 
     context = {
         'video': test_video,
