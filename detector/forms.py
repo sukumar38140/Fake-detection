@@ -64,12 +64,19 @@ class VideoUploadForm(forms.ModelForm):
     def clean_video_file(self):
         video = self.cleaned_data.get('video_file')
         if video:
-            # Validate file extension
-            valid_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm']
+            # Validate file extension - Support all documented formats
+            valid_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.mpeg', '.mpg', '.3gp', '.m4v']
             ext = '.' + video.name.split('.')[-1].lower()
             if ext not in valid_extensions:
                 raise forms.ValidationError(
-                    f'Unsupported video format. Supported: {", ".join(valid_extensions)}'
+                    f'Unsupported video format. Supported: MP4, AVI, MOV, MKV, WMV, FLV, WEBM, MPEG, MPG, 3GP, M4V'
+                )
+            
+            # Validate file size (max 1GB as per requirements)
+            max_size = 1073741824  # 1GB in bytes
+            if video.size > max_size:
+                raise forms.ValidationError(
+                    f'File size exceeds 1GB limit. Your file: {video.size / (1024*1024*1024):.2f}GB'
                 )
         return video
 
@@ -86,7 +93,8 @@ class ProfileForm(forms.ModelForm):
     )
     avatar = forms.ImageField(
         required=False,
-        widget=forms.ClearableFileInput(attrs={'class': 'form-file-input', 'id': 'profile-avatar'})
+        widget=forms.ClearableFileInput(attrs={'class': 'form-file-input', 'id': 'profile-avatar'}),
+        help_text='Supported formats: JPG, PNG, GIF. Max size: 10MB'
     )
 
     class Meta:
@@ -105,6 +113,25 @@ class ProfileForm(forms.ModelForm):
             self.fields['display_name'].initial = profile_instance.display_name
             self.fields['phone'].initial = profile_instance.phone
             self.fields['avatar'].initial = profile_instance.avatar
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get('avatar')
+        if avatar:
+            # Validate image format
+            valid_formats = ['.jpg', '.jpeg', '.png', '.gif']
+            ext = '.' + avatar.name.split('.')[-1].lower()
+            if ext not in valid_formats:
+                raise forms.ValidationError(
+                    f'Unsupported image format. Supported: JPG, PNG, GIF'
+                )
+            
+            # Validate image file size (max 10MB)
+            max_size = 10485760  # 10MB in bytes
+            if avatar.size > max_size:
+                raise forms.ValidationError(
+                    f'Image size exceeds 10MB limit. Your file: {avatar.size / (1024*1024):.2f}MB'
+                )
+        return avatar
 
     def save(self, commit=True):
         user = super(ProfileForm, self).save(commit=commit)

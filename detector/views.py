@@ -135,7 +135,12 @@ def dashboard(request):
 
 @login_required
 def upload_video(request):
-    """Handle video file upload - separated for samples and test videos."""
+    """
+    Handle video file upload - separated for samples and test videos.
+    
+    Supported formats: MP4, AVI, MOV, MKV, WMV, FLV, WEBM, MPEG, MPG, 3GP, M4V
+    Maximum file size: 1GB
+    """
     if request.method == 'POST':
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -146,9 +151,32 @@ def upload_video(request):
             if not video.title:
                 video.title = request.FILES['video_file'].name.split('.')[0]
 
-            # Calculate file size
+            # Calculate file size in MB
             video_file = request.FILES['video_file']
             video.file_size_mb = video_file.size / (1024 * 1024)
+            
+            # Backend validation: Check file size (1GB max)
+            max_size_bytes = 1073741824  # 1GB
+            if video_file.size > max_size_bytes:
+                messages.error(
+                    request,
+                    f'File size {video.file_size_mb:.2f}MB exceeds 1GB limit. Please upload a smaller video.'
+                )
+                return redirect('upload_video')
+            
+            # Backend validation: Check file format (as per documentation)
+            valid_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.mpeg', '.mpg', '.3gp', '.m4v']
+            ext = '.' + video_file.name.split('.')[-1].lower()
+            if ext not in valid_extensions:
+                messages.error(
+                    request,
+                    f'Unsupported video format "{ext.upper()}". Supported: MP4, AVI, MOV, MKV, WMV, FLV, WEBM, MPEG, MPG, 3GP, M4V'
+                )
+                return redirect('upload_video')
+            
+            # Initialize status and label as per documentation
+            video.status = 'uploaded'  # Initial status: Uploaded
+            video.label = 'unlabeled'   # Initial label: Unlabeled
             video.save()
 
             # Extract video metadata using OpenCV
@@ -158,18 +186,31 @@ def upload_video(request):
                 video.duration_seconds = info['duration']
                 video.save()
             except Exception as e:
-                print(f"Metadata extraction failed: {str(e)}")
+                # Log error but don't prevent upload
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Metadata extraction failed for video {video.id}: {str(e)}")
+                messages.warning(request, 'Video uploaded but metadata extraction failed. You can still use it.')
 
             video_type_display = 'Sample' if video.video_type == 'sample' else 'Test'
-            messages.success(request, f'{video_type_display} video "{video.title}" uploaded successfully! ({video.file_size_mb:.1f} MB)')
+            messages.success(
+                request,
+                f'✓ {video_type_display} video "{video.title}" uploaded successfully! '
+                f'({video.file_size_mb:.1f}MB • Status: Uploaded • Label: Unlabeled)'
+            )
             return redirect('upload_video')
+        else:
+            # Display form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         video_type = request.GET.get('type', 'sample')
         form = VideoUploadForm(initial={'video_type': video_type})
 
-    # Separate sample and test videos
-    sample_videos = Video.objects.filter(video_type='sample', user=request.user)
-    test_videos = Video.objects.filter(video_type='test', user=request.user)
+    # Separate sample and test videos (for management display)
+    sample_videos = Video.objects.filter(video_type='sample', user=request.user).order_by('-uploaded_at')
+    test_videos = Video.objects.filter(video_type='test', user=request.user).order_by('-uploaded_at')
     labeled_sample_count = sample_videos.exclude(label='unlabeled').count()
 
     context = {
@@ -177,6 +218,8 @@ def upload_video(request):
         'sample_videos': sample_videos,
         'test_videos': test_videos,
         'labeled_sample_count': labeled_sample_count,
+        'max_file_size_gb': 1,  # Pass to template for client-side display
+        'supported_formats': 'MP4, AVI, MOV, MKV, WMV, FLV, WEBM, MPEG, MPG, 3GP, M4V',
     }
     return render(request, 'detector/upload.html', context)
 

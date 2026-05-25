@@ -26,7 +26,7 @@ class Video(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
-    video_file = models.FileField(upload_to='inputvideos/')
+    video_file = models.FileField(upload_to='videos/original/')  # As per documentation
     uploaded_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='uploaded')
     label = models.CharField(max_length=20, choices=LABEL_CHOICES, default='unlabeled')
@@ -60,9 +60,12 @@ class Video(models.Model):
 
 class UserProfile(models.Model):
     """Stores extra settings and preferences for each user."""
+    # Supported image formats for profile
+    SUPPORTED_AVATAR_FORMATS = ['jpg', 'jpeg', 'png', 'gif']
+    
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
     display_name = models.CharField(max_length=150, blank=True)
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    avatar = models.ImageField(upload_to='profile_images/', null=True, blank=True)  # As per documentation
     phone = models.CharField(max_length=20, blank=True)
     preferred_frame_sample_rate = models.PositiveSmallIntegerField(default=5)
     preferred_validation_split = models.FloatField(default=0.2)

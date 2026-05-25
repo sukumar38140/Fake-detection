@@ -115,10 +115,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# File upload settings for large videos
-DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
+# File upload settings for large videos (1GB as per requirements)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1073741824  # 1GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1073741824  # 1GB
 DATA_UPLOAD_MAX_NUMBER_FILES = 100
+
+# Video file upload path (as per documentation: uploads/videos/original/)
+VIDEO_UPLOAD_DIR = 'videos/original/'
+
+# Profile image upload path (as per documentation: uploads/profile_images/)
+PROFILE_IMAGE_UPLOAD_DIR = 'profile_images/'
 
 # ML Model settings
 ML_MODELS_DIR = BASE_DIR / 'ml_models'
